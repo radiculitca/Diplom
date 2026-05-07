@@ -91,9 +91,13 @@ def get_column_groups(columns):
         else: groups[col] = [col]
     return groups
 
-def _get_answer_counts(df, q_name, groups_cache):
+def _get_answer_counts(df, q_name, groups_cache, merged_sub=None):
     actual_cols = groups_cache[q_name]
     data = df[actual_cols[0]] if len(actual_cols) == 1 else df[actual_cols].melt()['value']
+    if merged_sub and merged_sub in groups_cache:
+        sub_cols = groups_cache[merged_sub]
+        sub_data = df[sub_cols[0]] if len(sub_cols) == 1 else df[sub_cols].melt()['value']
+        data = pd.concat([data, sub_data], ignore_index=True)
     data = data.dropna()
     data = data[data.astype(str).str.strip() != ""]
     data = data[data.astype(str).str.lower() != "nan"]
@@ -128,7 +132,10 @@ def generate_report_data(upload_dir, request_data):
         for f_name, q_name in cfg.file_mapping.items():
             if f_name not in dfs or q_name not in groups_cache[f_name]:
                 continue
-            counts = _get_answer_counts(dfs[f_name], q_name, groups_cache[f_name])
+            counts = _get_answer_counts(
+                dfs[f_name], q_name, groups_cache[f_name],
+                merged_sub=cfg.merged_sub.get(f_name) if cfg.merged_sub else None
+            )
             if counts:
                 file_counts[f_name] = counts
                 all_answers.update(counts.keys())

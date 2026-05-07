@@ -3,6 +3,7 @@ window.processedFiles = [];
 window.questionMapping = {};
 window.questionSourceFile = {};
 window.charts = {};
+window.questionMerges = {}; // { "основной вопрос": "подвопрос" }
 
 // ===================== WIZARD NAVIGATION =====================
 let currentWizardStep = 0;
@@ -24,8 +25,8 @@ function goToStep(n) {
     });
 }
 
-document.getElementById('toStep4Btn').addEventListener('click', () => goToStep(3));
-document.getElementById('toStep6Btn').addEventListener('click', () => goToStep(5));
+document.getElementById('toStep4Btn').addEventListener('click', () => goToStep(4));
+document.getElementById('toStep6Btn').addEventListener('click', () => goToStep(6));
 
 function updateUploadBtn() {
     const f = document.getElementById('excelFile');
@@ -189,7 +190,7 @@ document.getElementById('sheetForm').addEventListener('submit', async (e) => {
 
             renderQuestionsStep3();
             renderLegendSettings();
-
+            renderMergeStep();
             goToStep(2);
         } else { showToast(data.message, 'danger'); }
     } catch (err) { showToast('Ошибка соединения с сервером', 'danger'); }
@@ -198,6 +199,168 @@ document.getElementById('sheetForm').addEventListener('submit', async (e) => {
         document.getElementById('sheetSpinner').classList.add('d-none');
     }
 });
+
+// для шага 2.5
+function renderMergeStep() {
+    window.questionMerges = {};
+    const container = document.getElementById('mergeQuestionsList');
+    container.innerHTML = '';
+
+    // Берём колонки из первого файла (не системные)
+    const allCols = [];
+    window.processedFiles.forEach(f => {
+        f.columns.forEach(c => {
+            if (!c.is_system && !allCols.find(x => x.name === c.name)) {
+                allCols.push(c);
+            }
+        });
+    });
+
+    if (allCols.length === 0) {
+        container.innerHTML = '<div class="text-muted p-3 text-center">Нет доступных вопросов</div>';
+        return;
+    }
+
+    allCols.forEach((col, idx) => {
+        const row = document.createElement('div');
+        row.className = 'list-group-item d-flex align-items-center gap-2 py-2';
+        row.dataset.colname = col.name;
+        row.id = `merge_row_${idx}`;
+        row.innerHTML = `
+            <span class="flex-grow-1 text-truncate fw-medium" title="${col.name}">${col.name}</span>
+            <span class="merge-badge badge bg-success d-none" data-for="${col.name}"></span>
+            <button type="button" class="btn btn-sm btn-outline-primary merge-add-btn flex-shrink-0"
+                    data-main="${col.name}" title="Добавить подвопрос">
+                <i class="fa-solid fa-plus"></i>
+            </button>`;
+        container.appendChild(row);
+    });
+
+    // Обновить вид строк, которые уже являются подвопросами других
+    _refreshMergeRowStates();
+}
+
+function _refreshMergeRowStates() {
+    const mergedAsChild = new Set(Object.values(window.questionMerges));
+
+    document.querySelectorAll('#mergeQuestionsList .list-group-item').forEach(row => {
+        const name = row.dataset.colname;
+        const isChild = mergedAsChild.has(name);
+        const mainFor = Object.keys(window.questionMerges).find(k => window.questionMerges[k] === name);
+
+        // Строка-подвопрос: серая, кнопка «+» скрыта
+        row.classList.toggle('text-muted', isChild);
+        row.style.opacity = isChild ? '0.45' : '';
+        row.querySelector('.merge-add-btn').classList.toggle('d-none', isChild);
+
+        // Бейдж на основном вопросе
+        const badge = row.querySelector('.merge-badge');
+        const merge = window.questionMerges[name];
+        if (merge) {
+            badge.textContent = merge.length > 35 ? merge.substring(0, 35) + '…' : merge;
+            badge.classList.remove('d-none');
+            // Добавить кнопку удаления объединения, если ещё нет
+            if (!row.querySelector('.merge-remove-btn')) {
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'btn btn-sm btn-outline-danger merge-remove-btn flex-shrink-0';
+                removeBtn.dataset.main = name;
+                removeBtn.title = 'Убрать объединение';
+                removeBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+                row.insertBefore(removeBtn, row.querySelector('.merge-add-btn'));
+            }
+        } else {
+            badge.classList.add('d-none');
+            row.querySelector('.merge-remove-btn')?.remove();
+        }
+    });
+}
+
+// Открытие модалки выбора подвопроса
+let _mergePickMainName = null;
+
+document.getElementById('mergeQuestionsList').addEventListener('click', e => {
+    const addBtn = e.target.closest('.merge-add-btn');
+    if (addBtn) {
+        _mergePickMainName = addBtn.dataset.main;
+        document.getElementById('mergePickMainLabel').textContent = _mergePickMainName;
+        document.getElementById('mergePickSearch').value = '';
+        _renderMergePickList('');
+        new bootstrap.Modal(document.getElementById('mergePickModal')).show();
+        return;
+    }
+    const removeBtn = e.target.closest('.merge-remove-btn');
+    if (removeBtn) {
+        delete window.questionMerges[removeBtn.dataset.main];
+        _refreshMergeRowStates();
+    }
+});
+
+function _renderMergePickList(query) {
+    const list = document.getElementById('mergePickList');
+    list.innerHTML = '';
+    const mergedAsChild = new Set(Object.values(window.questionMerges));
+
+    const allCols = [];
+    window.processedFiles.forEach(f => {
+        f.columns.forEach(c => {
+            if (!c.is_system && !allCols.find(x => x.name === c.name)) allCols.push(c);
+        });
+    });
+
+    const filtered = allCols.filter(c => {
+        if (c.name === _mergePickMainName) return false;       // сам себя
+        if (mergedAsChild.has(c.name)) return false;           // уже чей-то подвопрос
+        if (Object.keys(window.questionMerges).includes(c.name)) return false; // уже основной
+        if (query && !c.name.toLowerCase().includes(query.toLowerCase())) return false;
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        list.innerHTML = '<div class="text-muted p-3 text-center small">Нет доступных вопросов</div>';
+        return;
+    }
+
+    filtered.forEach(col => {
+        const item = document.createElement('div');
+        item.className = 'list-group-item list-group-item-action py-2 merge-pick-item';
+        item.dataset.colname = col.name;
+        item.innerHTML = `<span class="fw-medium">${col.name}</span>`;
+        item.addEventListener('click', () => {
+            window.questionMerges[_mergePickMainName] = col.name;
+            _refreshMergeRowStates();
+            bootstrap.Modal.getInstance(document.getElementById('mergePickModal')).hide();
+        });
+        list.appendChild(item);
+    });
+}
+
+document.getElementById('mergePickSearch').addEventListener('input', e => {
+    _renderMergePickList(e.target.value);
+});
+document.getElementById('mergePickSearchClear').addEventListener('click', () => {
+    document.getElementById('mergePickSearch').value = '';
+    _renderMergePickList('');
+});
+
+document.getElementById('toStep3Btn').addEventListener('click', () => {
+    // Применяем объединения: скрываем подвопросы из processedFiles
+    _applyMergestoProcessedFiles();
+    renderQuestionsStep3();
+    goToStep(3);
+});
+
+function _applyMergestoProcessedFiles() {
+    const childSet = new Set(Object.values(window.questionMerges));
+    // Скрыть подвопросы из каждого файла (пометить флагом merged_child)
+    window.processedFiles.forEach(f => {
+        f.columns.forEach(c => {
+            c.merged_child = childSet.has(c.name);
+        });
+    });
+    // Сохранить мёрджи в маппинге вопросов (используется при анализе)
+    // window.questionMerges уже содержит { main: child }
+}
 
 function renderQuestionsStep3() {
     window.questionMapping = {};
@@ -240,6 +403,7 @@ function _renderQuestionsForFile(fileIdx) {
     inner.style.cssText = 'width:max-content;min-width:100%';
 
     f.columns.forEach((colObj, colIdx) => {
+        if (colObj.merged_child) return;
         const isSystem = colObj.is_system;
         const qName = colObj.name;
         const cbId = `qcb_${fileIdx}_${colIdx}`;
@@ -1684,9 +1848,17 @@ document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
     const ALL_VIZ = ['Таблица', 'Столбчатая диаграмма', 'Накопленная диаграмма', 'Круговая диаграмма'];
     items.forEach(item => {
         const colName = item.getAttribute('data-col');
-        configs.push({ column: colName, viz_type: ALL_VIZ, file_mapping: window.questionMapping[colName] });
+        const subColName = window.questionMerges[colName];
+        let mergedSub = null;
+        if (subColName) {
+            mergedSub = {};
+            window.processedFiles.forEach(f => {
+                const subExists = f.columns.find(c => c.name === subColName);
+                if (subExists) mergedSub[f.clean_filename] = subColName;
+            });
+        }
+        configs.push({ column: colName, viz_type: ALL_VIZ, file_mapping: window.questionMapping[colName], merged_sub: mergedSub });
     });
-
     const payload = { file_labels: fileLabels, file_colors: fileColors, configs: configs };
 
     document.getElementById('analyzeBtn').disabled = true;
@@ -1811,8 +1983,7 @@ document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
                 });
                 renderTable(id);
             });
-
-            goToStep(4);
+            goToStep(5);
         } else { showToast(data.message, 'danger'); }
     } catch (err) { showToast('Ошибка соединения с сервером', 'danger'); }
     finally {

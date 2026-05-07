@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 
 class ProcessSheetFile(BaseModel):
@@ -12,6 +12,7 @@ class ColumnConfig(BaseModel):
     column: str
     viz_type: List[str]
     file_mapping: Dict[str, str]
+    merged_sub: Optional[Dict[str, str]] = None  # { clean_filename: sub_col_name }
 
 class AnalyzeRequest(BaseModel):
     file_labels: Dict[str, str]

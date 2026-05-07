@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:code.jquery.com)",
+      "WebFetch(domain:cdnjs.cloudflare.com)"
+    ]
+  }
+}

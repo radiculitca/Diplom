@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ru" style="height:100%">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link href="{{ url_for('static', path='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', path='css/fontawesome.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', path='css/select2.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', path='css/select2-bootstrap-5-theme.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', path='css/app.css') }}" rel="stylesheet">
+    <script src="{{ url_for('static', path='js/sortable.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/chart.umd.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/chartjs-plugin-datalabels.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/jquery-3.7.1.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/select2.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/select2-ru.js') }}"></script>
+</head>
+<body class="ui-system-font wizard-body">
+
+    <nav class="navbar navbar-dark bg-primary shadow-sm" style="flex-shrink:0;">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand" href="/"><i class="fa-solid fa-chart-pie me-2"></i>МГУ им. Огарева | Аналитика</a>
+        </div>
+    </nav>
+
+    <div class="wizard-outer">
+        <div class="wizard-container">
+            <div class="wizard-track" id="wizardTrack">
+
+                <!-- ШАГ 1: Загрузка -->
+                <div class="wizard-step" id="wizardStep0">
+                    <div class="wizard-card">
+                        <div class="wizard-step-header">
+                            <span class="wizard-step-num">1</span>
+                            <h4 class="wizard-step-title">Загрузка результатов анкетирования</h4>
+                        </div>
+                        <form id="uploadForm">
+                            <div id="dropZone" class="upload-dropzone">
+                                <i class="fa-solid fa-cloud-arrow-up fa-3x mb-3 upload-icon"></i>
+                                <p class="upload-title">Перетащите файлы сюда</p>
+                                <p class="upload-or">или</p>
+                                <label class="btn btn-primary btn-lg px-4 mb-3" for="excelFile">
+                                    <i class="fa-solid fa-folder-open me-2"></i>Выбрать файлы
+                                </label>
+                                <input class="d-none" type="file" id="excelFile" accept=".xlsx, .csv" multiple>
+                                <p class="text-muted small mb-0">Поддерживаемые форматы: XLSX, CSV</p>
+                                <div id="fileListPreview" class="upload-file-list"></div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- ШАГ 2: Листы -->
+                <div class="wizard-step" id="wizardStep1">
+                    <div class="wizard-card">
+                        <div class="wizard-step-header">
+                            <span class="wizard-step-num">2</span>
+                            <h4 class="wizard-step-title">Выберите листы для анализа</h4>
+                        </div>
+                        <form id="sheetForm">
+                            <div class="form-check pb-2">
+                                <input class="form-check-input" type="checkbox" id="selectAllSheets">
+                                <label class="form-check-label fw-bold" for="selectAllSheets">
+                                    <i class="fa-solid fa-check-double me-1"></i>Все листы
+                                </label>
+                            </div>
+                            <div class="scrollable-box mb-1" id="sheetCheckboxesContainer" style="max-height:52vh;"></div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- ШАГ 3: Вопросы -->
+                <div class="wizard-step" id="wizardStep2">
+                    <div class="wizard-card">
+                        <div class="wizard-step-header">
+                            <span class="wizard-step-num">3</span>
+                            <h4 class="wizard-step-title">Выбор вопросов для анализа</h4>
+                        </div>
+                        <div id="fileSelectContainer" class="mb-2" style="display:none">
+                            <label class="form-label small mb-1" for="fileSelectStep3">Вопросы из файла:</label>
+                            <select class="form-select form-select-sm" id="fileSelectStep3"></select>
+                        </div>
+                        <div id="selectAllQuestionsRow" class="d-flex justify-content-between align-items-center pb-2 flex-wrap gap-2">
+                            <div class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox" id="selectAllQuestions">
+                                <label class="form-check-label fw-bold" for="selectAllQuestions">
+                                    <i class="fa-solid fa-check-double me-1"></i>Все вопросы
+                                </label>
+                            </div>
+                            <div class="form-check form-switch mb-0 d-flex align-items-center gap-1">
+                                <input class="form-check-input me-2" type="checkbox" id="showHiddenCols" style="cursor:pointer;">
+                                <label class="form-check-label text-muted" for="showHiddenCols" style="cursor:pointer;">
+                                    <i class="fa-solid fa-eye me-1"></i>Скрытые
+                                </label>
+                                <i class="fa-regular fa-circle-question text-muted"
+                                   data-bs-toggle="tooltip"
+                                   data-bs-placement="top"
+                                   title="Служебные столбцы, скрытые по умолчанию: идентификаторы, метки времени и прочие технические поля, которые не являются вопросами анкеты"
+                                   style="cursor:help; font-size:0.8rem;"></i>
+                            </div>
+                        </div>
+                        <div class="">
+                            <div class="input-group input-group-sm">
+                                <input type="text" class="form-control" id="questionsSearchInput" placeholder="Поиск вопроса...">
+                                <button class="btn btn-outline-secondary" type="button" id="questionsSearchClear" tabindex="-1" title="Очистить поиск">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="allQuestionsList" class="scrollable-box pt-0 pb-0 pr-0 pl-1" style="max-height:45vh;overflow-x:auto;"></div>
+                    </div>
+                </div>
+
+                <!-- ШАГ 4: Настройка -->
+                <div class="wizard-step" id="wizardStep3">
+                    <div class="wizard-card">
+                        <div class="wizard-step-header">
+                            <span class="wizard-step-num">4</span>
+                            <h4 class="wizard-step-title">Настройка структуры отчёта</h4>
+                        </div>
+                        <form id="analyzeForm">
+                            <div class="mb-4 p-3 border rounded bg-light" id="legendSettingsBlock">
+                                <h6 class="fw-bold mb-3">
+                                    <i class="fa-solid fa-palette me-2"></i>Настройки отображения файлов (Легенда):
+                                </h6>
+                                <div id="legendInputsContainer" class="d-flex flex-wrap gap-3"></div>
+                            </div>
+                            <h6 class="fw-bold mb-3">Порядок вопросов (зажмите иконку "<i class="fa-solid fa-grip-lines"></i>" для передвижения):</h6>
+                            <div class="list-group mb-1" id="sortableQuestionsList"
+                                 style="min-height:80px;background:#f8f9fa;border:1px dashed #dee2e6;border-radius:5px;">
+                                <div class="p-3 text-center text-muted" id="emptySortablePlaceholder">
+                                    <i class="fa-solid fa-hand-pointer me-1"></i>Выберите вопросы на шаге 3, чтобы они появились здесь
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- ШАГ 5: Результаты -->
+                <div class="wizard-step" id="wizardStep4">
+                    <div class="wizard-card wizard-card-wide">
+                        <div class="wizard-step-header">
+                            <span class="wizard-step-num">5</span>
+                            <h4 class="wizard-step-title">Предварительный просмотр</h4>
+                        </div>
+                        <div id="reportContent"></div>
+                    </div>
+                </div>
+
+                <!-- ШАГ 6: Экспорт для ИИ -->
+                <div class="wizard-step" id="wizardStep5">
+                    <div class="wizard-card">
+                        <div class="wizard-step-header">
+                            <span class="wizard-step-num">6</span>
+                            <h4 class="wizard-step-title">Экспорт данных для ИИ-отчёта</h4>
+                        </div>
+                        <p class="bg-warning mb-4">
+                            Скорми этот файл ИИшке (Очищенные данные выбранных вопросов с учётом того, что ты натыкал в прошлых шагах)
+                        </p>
+                        <div class="d-flex justify-content-center">
+                            <button type="button" class="btn btn-success btn-lg px-5" id="downloadCleanedBtn">
+                                <i class="fa-solid fa-file-arrow-down me-2"></i>Скачать очищенные данные
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /wizard-track -->
+        </div><!-- /wizard-container -->
+
+        <!-- Нижняя панель: кнопки навигации + индикатор шагов -->
+        <div class="wizard-nav-bar">
+            <button type="button" class="btn btn-outline-secondary wizard-back-btn invisible" id="navBackBtn">
+                <i class="fa-solid fa-arrow-left me-2"></i>Назад
+            </button>
+
+            <div class="step-dots">
+                <span class="step-dot active" data-step="0"></span>
+                <span class="step-dot" data-step="1"></span>
+                <span class="step-dot" data-step="2"></span>
+                <span class="step-dot" data-step="3"></span>
+                <span class="step-dot" data-step="4"></span>
+                <span class="step-dot" data-step="5"></span>
+            </div>
+
+            <div class="d-flex align-items-center">
+                <!-- Шаг 1: загрузка -->
+                <div class="nav-step-fwd" data-fwd-step="0">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="spinner-border text-primary d-none" id="uploadSpinner" style="width:1.4rem;height:1.4rem;border-width:2px;"></div>
+                        <button type="submit" form="uploadForm" class="btn btn-primary px-4 nav-fwd-btn" id="uploadBtn" disabled>
+                            <i class="fa-solid fa-table-list me-1"></i>Выбрать листы <i class="fa-solid fa-arrow-right ms-2"></i>
+                        </button>
+                    </div>
+                </div>
+                <!-- Шаг 2: листы -->
+                <div class="nav-step-fwd d-none" data-fwd-step="1">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="spinner-border text-primary d-none" id="sheetSpinner" style="width:1.4rem;height:1.4rem;border-width:2px;"></div>
+                        <button type="submit" form="sheetForm" class="btn btn-primary px-4 nav-fwd-btn" id="processSheetsBtn" disabled>
+                            <i class="fa-solid fa-list-check me-1"></i>Выбрать вопросы <i class="fa-solid fa-arrow-right ms-2"></i>
+                        </button>
+                    </div>
+                </div>
+                <!-- Шаг 3: вопросы -->
+                <div class="nav-step-fwd d-none" data-fwd-step="2">
+                    <button type="button" class="btn btn-primary px-4 nav-fwd-btn" id="toStep4Btn" disabled>
+                        <i class="fa-solid fa-sliders me-1"></i>К настройке <i class="fa-solid fa-arrow-right ms-2"></i>
+                    </button>
+                </div>
+                <!-- Шаг 4: настройка -->
+                <div class="nav-step-fwd d-none" data-fwd-step="3">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="spinner-border text-primary d-none" id="analyzeSpinner" style="width:1.4rem;height:1.4rem;border-width:2px;"></div>
+                        <button type="submit" form="analyzeForm" class="btn btn-primary px-4 nav-fwd-btn" id="analyzeBtn" disabled>
+                            <i class="fa-solid fa-chart-bar me-1"></i>Построить отчёт <i class="fa-solid fa-arrow-right ms-2"></i>
+                        </button>
+                    </div>
+                </div>
+                <!-- Шаг 5: просмотр -->
+                <div class="nav-step-fwd d-none" data-fwd-step="4">
+                    <button type="button" class="btn btn-primary px-4 nav-fwd-btn" id="toStep6Btn">
+                        <i class="fa-solid fa-robot me-1"></i>К ИИ-отчёту <i class="fa-solid fa-arrow-right ms-2"></i>
+                    </button>
+                </div>
+                <!-- Шаг 6: нет кнопки вперёд -->
+                <div class="nav-step-fwd d-none" data-fwd-step="5"></div>
+            </div>
+        </div>
+    </div><!-- /wizard-outer -->
+
+    <!-- Модалки -->
+    <div class="modal fade" id="dataMappingModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fa-solid fa-code-merge me-2"></i>Соотнесение вопросов</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="mappingModalBody"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fa-solid fa-xmark me-1"></i>Отмена</button>
+                    <button type="button" class="btn btn-primary" id="saveMappingBtn"><i class="fa-solid fa-floppy-disk me-1"></i>Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="fuzzyConfirmModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title ui-system-font"><i class="fa-solid fa-object-group me-2"></i>Группировка ответов</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body ui-system-font">
+                    <ul class="nav nav-tabs mb-3" id="fuzzyModalTabs">
+                        <li class="nav-item">
+                            <button class="nav-link active" data-fuzzy-tab="fuzzy"><i class="fa-solid fa-spell-check me-1"></i>Похожие ответы</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-fuzzy-tab="ranges"><i class="fa-solid fa-sliders me-1"></i>Диапазоны</button>
+                        </li>
+                    </ul>
+                    <div id="fuzzyTabPane">
+                        <p>Ответы, отличающиеся не более чем на <strong>2 символа</strong>, будут объединены. Наиболее частый вариант станет основным.</p>
+                        <p class="text-danger small">После применения действие будет нельзя отменить.</p>
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="fuzzyPreviewBtn"><i class="fa-solid fa-layer-group me-1"></i>Сгруппировать</button>
+                    </div>
+                    <div id="rangesTabPane" class="d-none">
+                        <p class="text-muted small">Числовые ответы (исключённые не учитываются) разбиваются на равные диапазоны. Нечисловые ответы попадают в группу <em>«Другое»</em>.</p>
+                        <p class="text-danger small">После применения действие будет нельзя отменить.</p>
+                        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                            <label class="mb-0">Разбить на:</label>
+                            <input type="number" id="rangeCountInput" class="form-control form-control-sm" style="width:80px" min="2" max="20" value="4">
+                            <span class="text-muted">диапазонов</span>
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="rangesPreviewBtn"><i class="fa-solid fa-layer-group me-1"></i>Сгруппировать</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="manualRangesBtn" title="Задать границы диапазонов вручную"><i class="fa-solid fa-pen me-1"></i>Вручную</button>
+                        </div>
+                    </div>
+                    <div id="fuzzyPreviewArea" class="d-none">
+                        <hr class="my-2">
+                        <div class="small fw-bold text-muted mb-2"><i class="fa-solid fa-eye me-1"></i>Предварительный результат:</div>
+                        <div id="fuzzyPreviewContent" class="scrollable-box" style="max-height:220px;"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fa-solid fa-xmark me-1"></i>Отмена</button>
+                    <button type="button" class="btn btn-primary" id="fuzzyConfirmBtn" disabled><i class="fa-solid fa-check me-1"></i>Применить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="manualRangesModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title ui-system-font"><i class="fa-solid fa-pen me-2"></i>Ручная настройка диапазонов</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body ui-system-font" id="manualRangesBody" style="max-height:420px;overflow-y:auto;"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fa-solid fa-xmark me-1"></i>Отмена</button>
+                    <button type="button" class="btn btn-primary" id="applyManualRangesBtn"><i class="fa-solid fa-check me-1"></i>Применить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="chartEditModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title ui-system-font" id="chartEditModalLabel"><i class="fa-solid fa-pen-to-square me-2"></i>Редактирование данных</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body ui-system-font" id="chartEditModalBody"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal"><i class="fa-solid fa-check me-1"></i>Готово</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="hideColModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title ui-system-font"><i class="fa-solid fa-table-columns me-2"></i>Настройка таблицы</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body ui-system-font">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="hideColRadio" id="hideColNone" value="none">
+                        <label class="form-check-label" for="hideColNone">Не скрывать</label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="hideColRadio" id="hideColCount" value="count">
+                        <label class="form-check-label" for="hideColCount">Скрыть "Кол-во ответивших"</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="hideColRadio" id="hideColPct" value="percent">
+                        <label class="form-check-label" for="hideColPct">Скрыть "% от ответивших"</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fa-solid fa-xmark me-1"></i>Отмена</button>
+                    <button type="button" class="btn btn-primary" id="saveHideColBtn"><i class="fa-solid fa-check me-1"></i>Применить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', path='js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/transliteration.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/countries.js') }}"></script>
+    <script src="{{ url_for('static', path='js/app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+jinja2
+python-multipart
+pandas
+openpyxl
+pyarrow
+python-docx
+ollama

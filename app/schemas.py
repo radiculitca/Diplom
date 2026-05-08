@@ -23,6 +23,11 @@ class ExportRow(BaseModel):
     answer: str
     counts: Dict[str, int]
 
+class SectionInfo(BaseModel):
+    name: str
+    description: str = ""
+    color: str = ""
+
 class ExportQuestion(BaseModel):
     table_num: int
     question_name: str
@@ -34,6 +39,7 @@ class ExportQuestion(BaseModel):
     rows: List[ExportRow]
     file_totals: Dict[str, int]
     show_total: bool
+    section: Optional["SectionInfo"] = None
 
 class ExportDocxRequest(BaseModel):
     questions: List[ExportQuestion]

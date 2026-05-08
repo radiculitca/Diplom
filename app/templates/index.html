@@ -118,6 +118,15 @@
                 объедините их. Данные подвопроса будут добавлены к основному,
                 подвопрос скроется на следующих шагах.
               </p>
+              <!-- Панель разделов -->
+              <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+                  <div id="sectionChips" class="d-flex flex-wrap gap-2 align-items-center">
+                      <span class="text-muted small fst-italic">Разделы не заданы</span>
+                  </div>
+                  <button type="button" class="btn btn-sm btn-outline-secondary flex-shrink-0" id="addSectionBtn">
+                      <i class="fa-solid fa-layer-group me-1"></i>Добавить раздел
+                  </button>
+              </div>
               <div
                 id="mergeQuestionsList"
                 class="scrollable-box"
@@ -507,6 +516,58 @@
         </div>
       </div>
     </div>
+
+    <div class="modal fade" id="sectionModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+          <div class="modal-content">
+              <div class="modal-header">
+                  <h5 class="modal-title" id="sectionModalTitle">
+                      <i class="fa-solid fa-layer-group me-2"></i>Новый раздел
+                  </h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                  <div class="mb-3">
+                      <label class="form-label fw-medium">Название раздела <span class="text-danger">*</span></label>
+                      <input type="text" class="form-control" id="sectionNameInput" placeholder="Например: Демография">
+                      <div class="invalid-feedback">Введите название раздела</div>
+                  </div>
+                  <div class="mb-3">
+                      <label class="form-label fw-medium">Описание <span class="text-muted fw-normal small">(необязательно — попадёт в промпт для ИИ)</span></label>
+                      <textarea class="form-control" id="sectionDescInput" rows="2"
+                                placeholder="Краткое описание тематики раздела для аналитики"></textarea>
+                  </div>
+                  <div class="mb-3">
+                      <label class="form-label fw-medium">Цвет раздела</label>
+                      <div class="d-flex align-items-center gap-2">
+                          <input type="color" class="form-control form-control-color" id="sectionColorInput"
+                                style="width:40px;height:34px;padding:2px 3px;cursor:pointer;">
+                          <span class="text-muted small">Вопросы этого раздела будут выделены этим цветом</span>
+                      </div>
+                  </div>
+                  <div class="mb-1">
+                      <label class="form-label fw-medium">Вопросы раздела</label>
+                      <div class="form-check mb-2">
+                          <input class="form-check-input" type="checkbox" id="sectionSelectAll">
+                          <label class="form-check-label text-muted small" for="sectionSelectAll">Выбрать все доступные</label>
+                      </div>
+                      <div id="sectionQuestionPicker" class="scrollable-box" style="max-height:280px;"></div>
+                  </div>
+              </div>
+              <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-danger me-auto d-none" id="sectionDeleteBtn">
+                      <i class="fa-solid fa-trash me-1"></i>Удалить раздел
+                  </button>
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                      <i class="fa-solid fa-xmark me-1"></i>Отмена
+                  </button>
+                  <button type="button" class="btn btn-primary" id="saveSectionBtn">
+                      <i class="fa-solid fa-check me-1"></i>Применить
+                  </button>
+              </div>
+          </div>
+      </div>
+  </div>
 
     <div class="modal fade" id="fuzzyConfirmModal" tabindex="-1">
       <div class="modal-dialog modal-dialog-centered modal-lg">

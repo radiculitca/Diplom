@@ -49,10 +49,22 @@ def build_global_prompt(questions):
 
     for q in questions:
 
+        
+
+        sec = q.get("section")
+        if sec and sec.get("name"):
+            section_hint = f" [Раздел: {sec['name']}"
+            if sec.get("description"):
+                section_hint += f" — {sec['description']}"
+            section_hint += "]"
+        else:
+            section_hint = ""
+
         text += (
             f"\n\n"
-            f"Вопрос {q['table_num']} "
-            f"— {q['question_name']}\n"
+            f"Вопрос {q['table_num']}"
+            f"{section_hint}"
+            f" — {q['question_name']}\n"
         )
 
         for row in q["rows"]:
@@ -119,6 +131,8 @@ def generate_docx(questions: list) -> bytes:
 
     doc = Document()
 
+    _last_section_name = None
+
     for section in doc.sections:
 
         section.top_margin = Cm(2)
@@ -175,6 +189,31 @@ def generate_docx(questions: list) -> bytes:
         file_totals = q["file_totals"]
 
         is_single = len(file_keys) == 1
+
+    # Заголовок раздела (вставляется один раз перед первым вопросом раздела)
+    sec = q.get("section")
+    sec_name = sec.get("name") if sec else None
+    if sec_name and sec_name != _last_section_name:
+        _last_section_name = sec_name
+        doc.add_page_break()
+        _p(
+            doc,
+            sec_name,
+            bold=True,
+            size=14,
+            space_before=0,
+            space_after=4
+        )
+        if sec.get("description"):
+            _p(
+                doc,
+                sec.get("description"),
+                bold=False,
+                size=12,
+                space_before=0,
+                space_after=8
+            )
+
 
         # Заголовок вопроса
 

@@ -1428,6 +1428,71 @@ window.applyHiddenColumns = function(id) {
     }
 };
 
+// ===================== MERGE ANSWER MODAL =====================
+
+let _mergeAnswerTableId = null;
+let _mergeAnswerSourceIdx = null;
+let _mergeAnswerTargetIdx = null;
+
+window.openMergeAnswerModal = function(tableId, sourceIdx) {
+    _mergeAnswerTableId = tableId;
+    _mergeAnswerSourceIdx = sourceIdx;
+    _mergeAnswerTargetIdx = null;
+
+    const dataObj = window.appData[tableId];
+    const sourceRow = dataObj.data[sourceIdx];
+
+    document.getElementById('mergeAnswerSourceLabel').textContent =
+        sourceRow.answer.length > 60 ? sourceRow.answer.substring(0, 60) + '…' : sourceRow.answer;
+    document.getElementById('mergeAnswerConfirmBtn').disabled = true;
+
+    const list = document.getElementById('mergeAnswerPickList');
+    list.innerHTML = '';
+
+    dataObj.data.forEach((row, idx) => {
+        if (idx === sourceIdx) return; // сам себя нельзя
+        const item = document.createElement('div');
+        item.className = 'list-group-item list-group-item-action py-2 d-flex align-items-center gap-2';
+        item.dataset.idx = idx;
+        item.innerHTML = `
+            <span class="flex-grow-1">${row.answer}</span>
+            <span class="badge bg-secondary">${row._total}</span>`;
+        item.addEventListener('click', () => {
+            list.querySelectorAll('.list-group-item').forEach(el => el.classList.remove('active'));
+            item.classList.add('active');
+            _mergeAnswerTargetIdx = idx;
+            document.getElementById('mergeAnswerConfirmBtn').disabled = false;
+        });
+        list.appendChild(item);
+    });
+
+    new bootstrap.Modal(document.getElementById('mergeAnswerModal')).show();
+};
+
+document.getElementById('mergeAnswerConfirmBtn').addEventListener('click', () => {
+    if (_mergeAnswerTargetIdx === null || _mergeAnswerTableId === null) return;
+
+    const dataObj = window.appData[_mergeAnswerTableId];
+    const src = dataObj.data[_mergeAnswerSourceIdx];
+    const tgt = dataObj.data[_mergeAnswerTargetIdx];
+
+    // Суммируем counts
+    dataObj.file_keys.forEach(fk => {
+        tgt.counts[fk] = (tgt.counts[fk] || 0) + (src.counts[fk] || 0);
+    });
+    tgt._total += src._total;
+
+    // Удаляем исходную строку
+    dataObj.data.splice(_mergeAnswerSourceIdx, 1);
+
+    bootstrap.Modal.getInstance(document.getElementById('mergeAnswerModal')).hide();
+
+    renderTable(_mergeAnswerTableId);
+    drawChart(_mergeAnswerTableId);
+    drawStackedChart(_mergeAnswerTableId);
+    drawPieChart(_mergeAnswerTableId);
+});
+
 // ===================== PIE / BAR / STACKED CHARTS =====================
 
 const PIE_COLORS = [
@@ -1818,7 +1883,17 @@ function renderTable(tableId) {
                             </div>
                         </div>
                     </td>
-                    <td class="text-start align-middle"><span contenteditable="true" class="editable-cell answer-text" data-id="${tableId}" data-index="${idx}">${row.answer}</span></td>
+                    <td class="text-start align-middle">
+                        <div class="d-flex align-items-center gap-1">
+                            <span contenteditable="true" class="editable-cell answer-text flex-grow-1" data-id="${tableId}" data-index="${idx}">${row.answer}</span>
+                            <button type="button" class="btn btn-sm btn-link text-muted p-0 flex-shrink-0 merge-answer-open-btn"
+                                    onclick="openMergeAnswerModal('${tableId}', ${idx})"
+                                    title="Присоединить к другому ответу"
+                                    style="font-size:0.75rem;line-height:1;opacity:0.5;" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.5'">
+                                <i class="fa-solid fa-plus-circle"></i>
+                            </button>
+                        </div>
+                    </td>
                     ${tdHtml}
                 </tr>`;
         });

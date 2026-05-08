@@ -815,6 +815,32 @@
       </div>
     </div>
 
+    <div class="modal fade" id="mergeAnswerModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered modal-md modal-dialog-scrollable">
+          <div class="modal-content">
+              <div class="modal-header">
+                  <h5 class="modal-title ui-system-font">
+                      <i class="fa-solid fa-compress-arrows-alt me-2"></i>Присоединить ответ к...
+                  </h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body ui-system-font">
+                  <p class="text-muted small mb-1">Ответ: <strong id="mergeAnswerSourceLabel"></strong></p>
+                  <p class="text-muted small mb-3">Выберите ответ, к которому присоединить его данные:</p>
+                  <div id="mergeAnswerPickList" class="scrollable-box" style="max-height:320px;"></div>
+              </div>
+              <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                      <i class="fa-solid fa-xmark me-1"></i>Отмена
+                  </button>
+                  <button type="button" class="btn btn-primary" id="mergeAnswerConfirmBtn" disabled>
+                      <i class="fa-solid fa-check me-1"></i>Применить
+                  </button>
+              </div>
+          </div>
+      </div>
+  </div>
+
     <script src="{{ url_for('static', path='js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', path='js/transliteration.min.js') }}"></script>
     <script src="{{ url_for('static', path='js/countries.js') }}"></script>

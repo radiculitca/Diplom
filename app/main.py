@@ -8,7 +8,7 @@ import os
 
 from app.data_logic import clean_dataframe, generate_report_data, get_column_groups, is_system_column
 from app.schemas import ProcessSheetsRequest, AnalyzeRequest, ExportDocxRequest
-from app.docx_gen import generate_docx
+from app.docx_gen_all import generate_docx
 
 app = FastAPI(title="Система аналитики опросов МГУ им. Огарева")
 

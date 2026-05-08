@@ -4,6 +4,7 @@ window.questionMapping = {};
 window.questionSourceFile = {};
 window.charts = {};
 window.questionMerges = {}; // { "основной вопрос": "подвопрос" }
+window.questionSections = []; // [{ id, name, description, color, questions: [colName, ...] }]
 
 // ===================== WIZARD NAVIGATION =====================
 let currentWizardStep = 0;
@@ -200,13 +201,9 @@ document.getElementById('sheetForm').addEventListener('submit', async (e) => {
     }
 });
 
-// для шага 2.5
-function renderMergeStep() {
-    window.questionMerges = {};
-    const container = document.getElementById('mergeQuestionsList');
-    container.innerHTML = '';
+// ===================== ШАГ 2.5: ОБЪЕДИНЕНИЕ ВОПРОСОВ =====================
 
-    // Берём колонки из первого файла (не системные)
+function _getMergeAllCols() {
     const allCols = [];
     window.processedFiles.forEach(f => {
         f.columns.forEach(c => {
@@ -215,6 +212,16 @@ function renderMergeStep() {
             }
         });
     });
+    return allCols;
+}
+
+function renderMergeStep() {
+    window.questionMerges = {};
+    window.questionSections = [];
+    const container = document.getElementById('mergeQuestionsList');
+    container.innerHTML = '';
+
+    const allCols = _getMergeAllCols();
 
     if (allCols.length === 0) {
         container.innerHTML = '<div class="text-muted p-3 text-center">Нет доступных вопросов</div>';
@@ -227,6 +234,8 @@ function renderMergeStep() {
         row.dataset.colname = col.name;
         row.id = `merge_row_${idx}`;
         row.innerHTML = `
+            <span class="section-color-dot flex-shrink-0"
+                  style="width:10px;height:10px;border-radius:50%;background:transparent;flex-shrink:0;transition:background .2s;"></span>
             <span class="flex-grow-1 text-truncate fw-medium" title="${col.name}">${col.name}</span>
             <span class="merge-badge badge bg-success d-none" data-for="${col.name}"></span>
             <button type="button" class="btn btn-sm btn-outline-primary merge-add-btn flex-shrink-0"
@@ -236,7 +245,6 @@ function renderMergeStep() {
         container.appendChild(row);
     });
 
-    // Обновить вид строк, которые уже являются подвопросами других
     _refreshMergeRowStates();
 }
 
@@ -246,20 +254,16 @@ function _refreshMergeRowStates() {
     document.querySelectorAll('#mergeQuestionsList .list-group-item').forEach(row => {
         const name = row.dataset.colname;
         const isChild = mergedAsChild.has(name);
-        const mainFor = Object.keys(window.questionMerges).find(k => window.questionMerges[k] === name);
 
-        // Строка-подвопрос: серая, кнопка «+» скрыта
         row.classList.toggle('text-muted', isChild);
         row.style.opacity = isChild ? '0.45' : '';
         row.querySelector('.merge-add-btn').classList.toggle('d-none', isChild);
 
-        // Бейдж на основном вопросе
         const badge = row.querySelector('.merge-badge');
         const merge = window.questionMerges[name];
         if (merge) {
             badge.textContent = merge.length > 35 ? merge.substring(0, 35) + '…' : merge;
             badge.classList.remove('d-none');
-            // Добавить кнопку удаления объединения, если ещё нет
             if (!row.querySelector('.merge-remove-btn')) {
                 const removeBtn = document.createElement('button');
                 removeBtn.type = 'button';
@@ -273,6 +277,27 @@ function _refreshMergeRowStates() {
             badge.classList.add('d-none');
             row.querySelector('.merge-remove-btn')?.remove();
         }
+    });
+
+    _refreshSectionColors();
+}
+
+// Покрасить точки и фон строк в соответствии с разделами
+function _refreshSectionColors() {
+    // Сначала сбросить все
+    document.querySelectorAll('#mergeQuestionsList .list-group-item').forEach(row => {
+        row.style.borderLeft = '';
+        row.querySelector('.section-color-dot').style.background = 'transparent';
+    });
+
+    window.questionSections.forEach(sec => {
+        sec.questions.forEach(qName => {
+            const row = document.querySelector(`#mergeQuestionsList .list-group-item[data-colname="${CSS.escape(qName)}"]`);
+            if (row) {
+                row.style.borderLeft = `4px solid ${sec.color}`;
+                row.querySelector('.section-color-dot').style.background = sec.color;
+            }
+        });
     });
 }
 
@@ -300,18 +325,12 @@ function _renderMergePickList(query) {
     const list = document.getElementById('mergePickList');
     list.innerHTML = '';
     const mergedAsChild = new Set(Object.values(window.questionMerges));
-
-    const allCols = [];
-    window.processedFiles.forEach(f => {
-        f.columns.forEach(c => {
-            if (!c.is_system && !allCols.find(x => x.name === c.name)) allCols.push(c);
-        });
-    });
+    const allCols = _getMergeAllCols();
 
     const filtered = allCols.filter(c => {
-        if (c.name === _mergePickMainName) return false;       // сам себя
-        if (mergedAsChild.has(c.name)) return false;           // уже чей-то подвопрос
-        if (Object.keys(window.questionMerges).includes(c.name)) return false; // уже основной
+        if (c.name === _mergePickMainName) return false;
+        if (mergedAsChild.has(c.name)) return false;
+        if (Object.keys(window.questionMerges).includes(c.name)) return false;
         if (query && !c.name.toLowerCase().includes(query.toLowerCase())) return false;
         return true;
     });
@@ -344,7 +363,6 @@ document.getElementById('mergePickSearchClear').addEventListener('click', () => 
 });
 
 document.getElementById('toStep3Btn').addEventListener('click', () => {
-    // Применяем объединения: скрываем подвопросы из processedFiles
     _applyMergestoProcessedFiles();
     renderQuestionsStep3();
     goToStep(3);
@@ -352,20 +370,193 @@ document.getElementById('toStep3Btn').addEventListener('click', () => {
 
 function _applyMergestoProcessedFiles() {
     const childSet = new Set(Object.values(window.questionMerges));
-    // Скрыть подвопросы из каждого файла (пометить флагом merged_child)
     window.processedFiles.forEach(f => {
         f.columns.forEach(c => {
             c.merged_child = childSet.has(c.name);
         });
     });
-    // Сохранить мёрджи в маппинге вопросов (используется при анализе)
-    // window.questionMerges уже содержит { main: child }
 }
+
+// ===================== РАЗДЕЛЫ =====================
+
+const SECTION_PALETTE = [
+    '#4472C4', '#70AD47', '#FFC000', '#ED7D31',
+    '#9B59B6', '#1ABC9C', '#E74C3C', '#3498DB',
+    '#F39C12', '#16A085'
+];
+
+let _sectionEditId = null; // null = создание, иначе id раздела
+
+function _nextSectionColor() {
+    const used = window.questionSections.map(s => s.color);
+    return SECTION_PALETTE.find(c => !used.includes(c)) || SECTION_PALETTE[window.questionSections.length % SECTION_PALETTE.length];
+}
+
+// Открыть модалку создания нового раздела
+document.getElementById('addSectionBtn').addEventListener('click', () => {
+    _sectionEditId = null;
+    document.getElementById('sectionNameInput').value = '';
+    document.getElementById('sectionDescInput').value = '';
+    document.getElementById('sectionColorInput').value = _nextSectionColor();
+    document.getElementById('sectionModalTitle').textContent = 'Новый раздел';
+    document.getElementById('sectionDeleteBtn').classList.add('d-none');
+
+    _renderSectionQuestionPicker(null);
+    new bootstrap.Modal(document.getElementById('sectionModal')).show();
+});
+
+// Открыть модалку редактирования существующего раздела
+function openEditSection(sectionId) {
+    const sec = window.questionSections.find(s => s.id === sectionId);
+    if (!sec) return;
+    _sectionEditId = sectionId;
+    document.getElementById('sectionNameInput').value = sec.name;
+    document.getElementById('sectionDescInput').value = sec.description || '';
+    document.getElementById('sectionColorInput').value = sec.color;
+    document.getElementById('sectionModalTitle').textContent = 'Редактировать раздел';
+    document.getElementById('sectionDeleteBtn').classList.remove('d-none');
+
+    _renderSectionQuestionPicker(sec);
+    new bootstrap.Modal(document.getElementById('sectionModal')).show();
+}
+
+// Рендер списка вопросов в модалке раздела
+function _renderSectionQuestionPicker(existingSec) {
+    const container = document.getElementById('sectionQuestionPicker');
+    container.innerHTML = '';
+
+    const mergedAsChild = new Set(Object.values(window.questionMerges));
+    const allCols = _getMergeAllCols().filter(c => !mergedAsChild.has(c.name));
+
+    // Вопросы уже занятые другими разделами (не текущим)
+    const takenByOther = new Set();
+    window.questionSections.forEach(s => {
+        if (existingSec && s.id === existingSec.id) return;
+        s.questions.forEach(q => takenByOther.add(q));
+    });
+
+    allCols.forEach(col => {
+        const isTaken = takenByOther.has(col.name);
+        const isChecked = existingSec ? existingSec.questions.includes(col.name) : false;
+        const takenSec = isTaken
+            ? window.questionSections.find(s => s.questions.includes(col.name))
+            : null;
+
+        const item = document.createElement('div');
+        item.className = 'form-check py-1 border-bottom';
+        item.innerHTML = `
+            <input class="form-check-input section-q-cb" type="checkbox" id="sq_${col.name.replace(/\W/g,'_')}"
+                   value="${col.name}" ${isChecked ? 'checked' : ''} ${isTaken ? 'disabled' : ''}>
+            <label class="form-check-label ${isTaken ? 'text-muted' : ''}"
+                   for="sq_${col.name.replace(/\W/g,'_')}">
+                ${col.name}
+                ${isTaken && takenSec ? `<span class="badge ms-1" style="background:${takenSec.color};font-size:0.65rem;">${takenSec.name}</span>` : ''}
+            </label>`;
+        container.appendChild(item);
+    });
+
+    // Чекбокс "Все"
+    const total = container.querySelectorAll('.section-q-cb:not(:disabled)').length;
+    const checked = container.querySelectorAll('.section-q-cb:not(:disabled):checked').length;
+    document.getElementById('sectionSelectAll').checked = total > 0 && total === checked;
+    document.getElementById('sectionSelectAll').indeterminate = checked > 0 && checked < total;
+}
+
+// "Выбрать все" в модалке раздела
+document.getElementById('sectionSelectAll').addEventListener('change', e => {
+    document.querySelectorAll('#sectionQuestionPicker .section-q-cb:not(:disabled)').forEach(cb => {
+        cb.checked = e.target.checked;
+    });
+});
+
+document.getElementById('sectionQuestionPicker').addEventListener('change', () => {
+    const total = document.querySelectorAll('#sectionQuestionPicker .section-q-cb:not(:disabled)').length;
+    const checked = document.querySelectorAll('#sectionQuestionPicker .section-q-cb:not(:disabled):checked').length;
+    document.getElementById('sectionSelectAll').checked = total > 0 && total === checked;
+    document.getElementById('sectionSelectAll').indeterminate = checked > 0 && checked < total;
+});
+
+// Сохранить раздел
+document.getElementById('saveSectionBtn').addEventListener('click', () => {
+    const name = document.getElementById('sectionNameInput').value.trim();
+    if (!name) {
+        document.getElementById('sectionNameInput').classList.add('is-invalid');
+        return;
+    }
+    document.getElementById('sectionNameInput').classList.remove('is-invalid');
+
+    const description = document.getElementById('sectionDescInput').value.trim();
+    const color = document.getElementById('sectionColorInput').value;
+    const questions = Array.from(
+        document.querySelectorAll('#sectionQuestionPicker .section-q-cb:checked')
+    ).map(cb => cb.value);
+
+    if (_sectionEditId !== null) {
+        // Редактирование
+        const sec = window.questionSections.find(s => s.id === _sectionEditId);
+        if (sec) {
+            sec.name = name;
+            sec.description = description;
+            sec.color = color;
+            sec.questions = questions;
+        }
+    } else {
+        // Создание
+        window.questionSections.push({
+            id: Date.now(),
+            name,
+            description,
+            color,
+            questions
+        });
+    }
+
+    bootstrap.Modal.getInstance(document.getElementById('sectionModal')).hide();
+    _refreshSectionColors();
+    _renderSectionChips();
+});
+
+// Удалить раздел
+document.getElementById('sectionDeleteBtn').addEventListener('click', () => {
+    if (_sectionEditId !== null) {
+        window.questionSections = window.questionSections.filter(s => s.id !== _sectionEditId);
+        bootstrap.Modal.getInstance(document.getElementById('sectionModal')).hide();
+        _refreshSectionColors();
+        _renderSectionChips();
+    }
+});
+
+// Рендер чипов разделов над списком вопросов
+function _renderSectionChips() {
+    const container = document.getElementById('sectionChips');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (window.questionSections.length === 0) {
+        container.innerHTML = '<span class="text-muted small fst-italic">Разделы не заданы</span>';
+        return;
+    }
+
+    window.questionSections.forEach(sec => {
+        const chip = document.createElement('span');
+        chip.className = 'badge rounded-pill d-inline-flex align-items-center gap-1 section-chip';
+        chip.style.cssText = `background:${sec.color};cursor:pointer;font-size:0.8rem;padding:5px 10px;`;
+        chip.title = sec.description || sec.name;
+        chip.innerHTML = `
+            <i class="fa-solid fa-layer-group" style="font-size:0.7rem;"></i>
+            ${sec.name}
+            <span class="ms-1" style="opacity:0.7;font-size:0.75rem;">${sec.questions.length}</span>`;
+        chip.addEventListener('click', () => openEditSection(sec.id));
+        container.appendChild(chip);
+    });
+}
+
+// ===================== ШАГ 3: ВОПРОСЫ =====================
 
 function renderQuestionsStep3() {
     window.questionMapping = {};
     window.questionSourceFile = {};
-    document.getElementById('sortableQuestionsList').innerHTML = '<div class="p-3 text-center text-muted" id="emptySortablePlaceholder"><i class="fa-solid fa-hand-pointer me-1"></i>Выберите вопросы на шаге 3, чтобы они появились здесь</div>';
+    document.getElementById('sortableQuestionsList').innerHTML = '<div class="p-3 text-center text-muted" id="emptySortablePlaceholder"><i class="fa-solid fa-hand-pointer me-1"></i>Выберите вопросы на шаге 4, чтобы они появились здесь</div>';
 
     const fileSelect = document.getElementById('fileSelectStep3');
     const fileSelectContainer = document.getElementById('fileSelectContainer');
@@ -388,6 +579,11 @@ function renderQuestionsStep3() {
     updateQuestionsBtn();
 }
 
+function _getQuestionSectionColor(qName) {
+    const sec = window.questionSections.find(s => s.questions.includes(qName));
+    return sec ? sec.color : null;
+}
+
 function _renderQuestionsForFile(fileIdx) {
     document.getElementById('questionsSearchInput').value = '';
     const container = document.getElementById('allQuestionsList');
@@ -407,11 +603,19 @@ function _renderQuestionsForFile(fileIdx) {
         const isSystem = colObj.is_system;
         const qName = colObj.name;
         const cbId = `qcb_${fileIdx}_${colIdx}`;
+        const sectionColor = _getQuestionSectionColor(qName);
+
         const item = document.createElement('div');
         const hiddenClass = isSystem ? 'system-col' + (showHidden ? '' : ' d-none') : '';
         const labelColor = isSystem ? 'text-secondary' : 'text-dark';
         item.className = `list-group-item d-flex align-items-center gap-2 py-2 q-item-container ${hiddenClass}`;
         item.dataset.qname = qName;
+
+        // Цветовая полоска раздела слева
+        if (sectionColor) {
+            item.style.borderLeft = `4px solid ${sectionColor}`;
+        }
+
         item.innerHTML = `
             <input class="form-check-input flex-shrink-0 q-checkbox" type="checkbox" id="${cbId}" value="${qName}"${selectedQNames.has(qName) ? ' checked' : ''}>
             <label class="form-check-label fw-medium ${labelColor}" for="${cbId}" style="white-space:nowrap;cursor:pointer" title="${qName}">${qName}</label>`;
@@ -447,7 +651,7 @@ document.getElementById('fileSelectStep3').addEventListener('change', (e) => {
         delete window.questionMapping[el.dataset.col];
         delete window.questionSourceFile[el.dataset.col];
     });
-    document.getElementById('sortableQuestionsList').innerHTML = '<div class="p-3 text-center text-muted" id="emptySortablePlaceholder"><i class="fa-solid fa-hand-pointer me-1"></i>Выберите вопросы на шаге 3, чтобы они появились здесь</div>';
+    document.getElementById('sortableQuestionsList').innerHTML = '<div class="p-3 text-center text-muted" id="emptySortablePlaceholder"><i class="fa-solid fa-hand-pointer me-1"></i>Выберите вопросы на шаге 4, чтобы они появились здесь</div>';
     document.getElementById('selectAllQuestions').checked = false;
     updateQuestionsBtn();
     _renderQuestionsForFile(parseInt(e.target.value, 10));
@@ -495,7 +699,7 @@ function addQuestionToSortable(qName, sourceFileIdx) {
     if (alreadyExists) return;
 
     const missingIn = autoMapQuestion(qName, sourceFileIdx ?? 0);
-    const safeId = "dd_" + Math.random().toString(36).slice(2, 11);
+    const sectionColor = _getQuestionSectionColor(qName);
 
     const warningHtml = missingIn.length > 0
         ? `<span class="missing-warning ms-2" data-bs-toggle="tooltip" title="Вопрос не найден в: ${missingIn.join(', ')}"><i class="fa-solid fa-circle-exclamation"></i></span>`
@@ -505,13 +709,22 @@ function addQuestionToSortable(qName, sourceFileIdx) {
         ? `<a class="mapping-btn ms-2" title="Соотнести вручную" onclick="openMappingModal('${qName}')"><i class="fa-solid fa-link"></i></a>`
         : '';
 
-    sortableContainer.insertAdjacentHTML('beforeend', `
-        <div class="list-group-item d-flex align-items-center question-item bg-white" data-col="${qName}">
-            <span class="drag-handle me-3" title="Потяните, чтобы переместить"><i class="fa-solid fa-grip-lines"></i></span>
-            <span class="text-truncate fw-medium text-dark flex-grow-1" title="${qName}">${qName}</span>
-            ${warningHtml}
-            ${mappingBtnHtml}
-        </div>`);
+    const colorDot = sectionColor
+        ? `<span style="width:8px;height:8px;border-radius:50%;background:${sectionColor};flex-shrink:0;display:inline-block;margin-right:4px;"></span>`
+        : '';
+
+    const item = document.createElement('div');
+    item.className = 'list-group-item d-flex align-items-center question-item bg-white';
+    item.setAttribute('data-col', qName);
+    if (sectionColor) item.style.borderLeft = `4px solid ${sectionColor}`;
+    item.innerHTML = `
+        <span class="drag-handle me-3" title="Потяните, чтобы переместить"><i class="fa-solid fa-grip-lines"></i></span>
+        ${colorDot}
+        <span class="text-truncate fw-medium text-dark flex-grow-1" title="${qName}">${qName}</span>
+        ${warningHtml}
+        ${mappingBtnHtml}`;
+
+    sortableContainer.appendChild(item);
 
     initTooltips();
     checkEmptyPlaceholder();
@@ -677,6 +890,8 @@ document.getElementById('sortableQuestionsList').addEventListener('change', (e) 
     }
 });
 
+// ===================== FUZZY / RANGES =====================
+
 function levenshtein(a, b) {
     if (a === b) return 0;
     if (a.length === 0) return b.length;
@@ -745,7 +960,6 @@ window.confirmFuzzyMapping = function(id) {
     new bootstrap.Modal(document.getElementById('fuzzyConfirmModal')).show();
 };
 
-// Tab switching — clears preview
 document.getElementById('fuzzyModalTabs').addEventListener('click', e => {
     const btn = e.target.closest('[data-fuzzy-tab]');
     if (!btn) return;
@@ -757,14 +971,12 @@ document.getElementById('fuzzyModalTabs').addEventListener('click', e => {
     _fuzzyResetPreview();
 });
 
-// "Сгруппировать" for fuzzy tab
 document.getElementById('fuzzyPreviewBtn').addEventListener('click', () => {
     if (!_fuzzyTargetId) return;
     const result = _computeFuzzyMerge(_fuzzyTargetId);
     if (result) _fuzzyShowPreview(result.data, result.origAnswers);
 });
 
-// "Сгруппировать" for ranges tab
 document.getElementById('rangesPreviewBtn').addEventListener('click', () => {
     if (!_fuzzyTargetId) return;
     const n = parseInt(document.getElementById('rangeCountInput').value, 10);
@@ -780,7 +992,6 @@ document.getElementById('rangesPreviewBtn').addEventListener('click', () => {
     }
 });
 
-// "Вручную" — открыть модалку ручной настройки диапазонов
 document.getElementById('manualRangesBtn').addEventListener('click', () => {
     if (!_fuzzyTargetId) return;
     const n = parseInt(document.getElementById('rangeCountInput').value, 10);
@@ -790,9 +1001,7 @@ document.getElementById('manualRangesBtn').addEventListener('click', () => {
     if (!dataObj) return;
 
     const activeRows = dataObj.data.filter(r => r.included !== false);
-    const numericVals = activeRows
-        .map(r => parseFloat(r.answer))
-        .filter(v => !isNaN(v));
+    const numericVals = activeRows.map(r => parseFloat(r.answer)).filter(v => !isNaN(v));
 
     let preRanges;
     if (numericVals.length >= 2) {
@@ -818,7 +1027,6 @@ document.getElementById('manualRangesBtn').addEventListener('click', () => {
     new bootstrap.Modal(document.getElementById('manualRangesModal')).show();
 });
 
-// "Применить" в модалке ручных диапазонов
 document.getElementById('applyManualRangesBtn').addEventListener('click', () => {
     if (!_fuzzyTargetId) return;
 
@@ -867,13 +1075,10 @@ document.getElementById('manualRangesBody').addEventListener('input', e => {
     }
 });
 
-// "Применить"
 document.getElementById('fuzzyConfirmBtn').addEventListener('click', () => {
     bootstrap.Modal.getInstance(document.getElementById('fuzzyConfirmModal')).hide();
     if (_pendingMergeData && _fuzzyTargetId) _applyMergedData(_fuzzyTargetId, _pendingMergeData);
 });
-
-// --- Compute functions (pure, do not mutate state) ---
 
 function _computeFuzzyMerge(id) {
     const dataObj = window.appData[id];
@@ -955,20 +1160,14 @@ function _computeRangeMerge(id, numRanges) {
     const dataObj = window.appData[id];
     if (!dataObj || dataObj.data.length === 0) return null;
 
-    // Only active (non-excluded) rows participate in numeric range calculation
     const activeRows = dataObj.data.filter(r => r.included !== false);
-
     const numeric = [];
     const other = [];
     for (const row of activeRows) {
         const v = parseFloat(row.answer);
-        if (!isNaN(v) && String(row.answer).trim() !== '') {
-            numeric.push({ row, v });
-        } else {
-            other.push(row);
-        }
+        if (!isNaN(v) && String(row.answer).trim() !== '') numeric.push({ row, v });
+        else other.push(row);
     }
-
     if (numeric.length === 0) return null;
 
     const minVal = Math.min(...numeric.map(x => x.v));
@@ -982,8 +1181,7 @@ function _computeRangeMerge(id, numRanges) {
             answer: `${Math.round(lo)} – ${Math.round(hi)}`,
             lo, hi, isLast: i === numRanges - 1,
             counts: Object.fromEntries(dataObj.file_keys.map(fk => [fk, 0])),
-            included: true,
-            _total: 0
+            included: true, _total: 0
         };
     });
 
@@ -994,7 +1192,6 @@ function _computeRangeMerge(id, numRanges) {
     }
 
     const data = buckets.map(({ answer, counts, included, _total }) => ({ answer, counts, included, _total }));
-
     if (other.length > 0) {
         const otherRow = { answer: 'Другое', counts: Object.fromEntries(dataObj.file_keys.map(fk => [fk, 0])), included: true, _total: 0 };
         for (const row of other) {
@@ -1003,7 +1200,6 @@ function _computeRangeMerge(id, numRanges) {
         }
         data.push(otherRow);
     }
-
     return { data };
 }
 
@@ -1016,11 +1212,8 @@ function _computeRangeMergeCustom(id, customRanges) {
     const other = [];
     for (const row of activeRows) {
         const v = parseFloat(row.answer);
-        if (!isNaN(v) && String(row.answer).trim() !== '') {
-            numeric.push({ row, v });
-        } else {
-            other.push(row);
-        }
+        if (!isNaN(v) && String(row.answer).trim() !== '') numeric.push({ row, v });
+        else other.push(row);
     }
     if (numeric.length === 0) return null;
 
@@ -1028,8 +1221,7 @@ function _computeRangeMergeCustom(id, customRanges) {
         answer: `${r.lo} – ${r.hi}`,
         lo: r.lo, hi: r.hi, isLast: r.isLast,
         counts: Object.fromEntries(dataObj.file_keys.map(fk => [fk, 0])),
-        included: true,
-        _total: 0
+        included: true, _total: 0
     }));
 
     const unmatched = [];
@@ -1038,13 +1230,10 @@ function _computeRangeMergeCustom(id, customRanges) {
         if (bucket) {
             dataObj.file_keys.forEach(fk => { bucket.counts[fk] += row.counts[fk] || 0; });
             bucket._total += row._total;
-        } else {
-            unmatched.push(row);
-        }
+        } else { unmatched.push(row); }
     }
 
     const data = buckets.map(({ answer, counts, included, _total }) => ({ answer, counts, included, _total }));
-
     const leftover = [...other, ...unmatched];
     if (leftover.length > 0) {
         const otherRow = { answer: 'Другое', counts: Object.fromEntries(dataObj.file_keys.map(fk => [fk, 0])), included: true, _total: 0 };
@@ -1054,7 +1243,6 @@ function _computeRangeMergeCustom(id, customRanges) {
         }
         data.push(otherRow);
     }
-
     return { data };
 }
 
@@ -1070,11 +1258,12 @@ function _applyMergedData(id, newData) {
     }
 }
 
-// Kept as a thin wrapper (used nowhere else, but harmless)
 function applyFuzzyMapping(id) {
     const result = _computeFuzzyMerge(id);
     if (result) _applyMergedData(id, result.data);
 }
+
+// ===================== CHART EDIT MODAL =====================
 
 function renderChartEditModal(id) {
     const dataObj = window.appData[id];
@@ -1150,14 +1339,12 @@ window.openChartEditModal = function(id) {
     const dialog = modalEl.querySelector('.modal-dialog');
     const header = modalEl.querySelector('.modal-header');
 
-    // Restore page scroll after Bootstrap adds modal-open to body
     modalEl.addEventListener('shown.bs.modal', () => {
         document.body.classList.remove('modal-open');
         document.body.style.overflow = '';
         document.body.style.paddingRight = '';
     });
 
-    // Close when clicking outside the dialog
     document.addEventListener('mousedown', (e) => {
         if (!modalEl.classList.contains('show')) return;
         if (!dialog.contains(e.target)) {
@@ -1165,7 +1352,6 @@ window.openChartEditModal = function(id) {
         }
     });
 
-    // Drag by header
     header.style.cursor = 'grab';
     let dragging = false, ox = 0, oy = 0;
 
@@ -1195,7 +1381,8 @@ window.openChartEditModal = function(id) {
     });
 }());
 
-// --- МОДАЛКА СКРЫТИЯ СТОЛБЦОВ ---
+// ===================== HIDE COL MODAL =====================
+
 let currentHideColTableId = null;
 window.openHideColModal = function(id) {
     currentHideColTableId = id;
@@ -1210,10 +1397,8 @@ document.getElementById('saveHideColBtn').addEventListener('click', () => {
     let opt = 'none';
     if (document.getElementById('hideColCount').checked) opt = 'count';
     if (document.getElementById('hideColPct').checked) opt = 'percent';
-    
     window.appData[currentHideColTableId].options.hiddenCol = opt;
     applyHiddenColumns(currentHideColTableId);
-    
     bootstrap.Modal.getInstance(document.getElementById('hideColModal')).hide();
 });
 
@@ -1222,14 +1407,14 @@ window.applyHiddenColumns = function(id) {
     if (!table) return;
     const opt = window.appData[id].options.hiddenCol || 'none';
     const isVert = window.appData[id].options.tableVertical;
-    
+
     table.querySelectorAll(`.count-col-${id}`).forEach(el => el.classList.toggle('d-none', opt === 'count'));
     table.querySelectorAll(`.pct-col-${id}`).forEach(el => el.classList.toggle('d-none', opt === 'percent'));
-    
+
     const fileHeaders = table.querySelectorAll(`.file-header-${id}`);
     const colspanVal = opt === 'none' ? '2' : '1';
     fileHeaders.forEach(el => el.setAttribute('colspan', colspanVal));
-    
+
     if (!isVert) {
         const row1Ths = table.querySelectorAll(`.main-th-${id}`);
         const row2 = document.getElementById(`thead_row2_${id}`);
@@ -1237,11 +1422,13 @@ window.applyHiddenColumns = function(id) {
             if(row2) row2.classList.remove('d-none');
             row1Ths.forEach(el => el.setAttribute('rowspan', '2'));
         } else {
-            if(row2) row2.classList.add('d-none'); 
+            if(row2) row2.classList.add('d-none');
             row1Ths.forEach(el => el.setAttribute('rowspan', '1'));
         }
     }
 };
+
+// ===================== PIE / BAR / STACKED CHARTS =====================
 
 const PIE_COLORS = [
     '#dc3545','#0d6efd','#198754','#ffc107','#6f42c1',
@@ -1303,14 +1490,7 @@ function drawPieChart(id) {
                 responsive: false,
                 plugins: {
                     legend: { display: dataObj.options.showLegend !== false, position: 'bottom', labels: { font: { family: '"Times New Roman", Times, serif', size: 11 } } },
-                    tooltip: {
-                        enabled: true,
-                        displayColors: false,
-                        callbacks: {
-                            title: (items) => activeData[items[0].dataIndex]?.answer || '',
-                            label: (ctx) => ctx.raw
-                        }
-                    },
+                    tooltip: { enabled: true, displayColors: false, callbacks: { title: (items) => activeData[items[0].dataIndex]?.answer || '', label: (ctx) => ctx.raw } },
                     datalabels: {
                         color: '#fff',
                         font: { family: '"Times New Roman", Times, serif', size: 13, weight: 'bold' },
@@ -1340,13 +1520,11 @@ function drawChart(id) {
     const topN = dataObj.options.highlightTop ? Math.min(dataObj.options.topN, activeData.length * dataObj.file_keys.length) : 0;
     const HIGHLIGHT_COLOR = dataObj.options.highlightColor || '#0d6efd';
 
-    // Per-file totals from ALL data so percentages stay stable when rows are excluded
     const fileTotals = {};
     dataObj.file_keys.forEach(fk => {
         fileTotals[fk] = dataObj.data.reduce((sum, r) => sum + (r.counts[fk] || 0), 0);
     });
 
-    // Rank individual bars by percentage (so cross-file top is fair)
     const allBars = [];
     activeData.forEach(r => {
         dataObj.file_keys.forEach(fk => {
@@ -1397,7 +1575,7 @@ function drawChart(id) {
 
     window.charts[id] = new Chart(ctx, {
         type: 'bar',
-        data: { labels: labels, datasets: datasets },
+        data: { labels, datasets },
         options: {
             indexAxis: dataObj.options.chartDirection,
             responsive: true,
@@ -1410,36 +1588,15 @@ function drawChart(id) {
                         font: { family: '"Times New Roman", Times, serif', size: 12 },
                         generateLabels: (chart) => dataObj.file_keys.map((fk, i) => {
                             const ds = chart.data.datasets[i];
-                            return {
-                                text: ds.label,
-                                fillStyle: dataObj.file_colors[fk],
-                                strokeStyle: dataObj.file_colors[fk],
-                                lineWidth: 1,
-                                hidden: !chart.isDatasetVisible(i),
-                                datasetIndex: i
-                            };
+                            return { text: ds.label, fillStyle: dataObj.file_colors[fk], strokeStyle: dataObj.file_colors[fk], lineWidth: 1, hidden: !chart.isDatasetVisible(i), datasetIndex: i };
                         })
                     }
                 },
-                tooltip: {
-                    enabled: true,
-                    displayColors: datasets.length > 1,
-                    callbacks: {
-                        title: (items) => activeData[items[0].dataIndex]?.answer || '',
-                        label: (ctx) => (datasets.length > 1 ? ctx.dataset.label + ': ' : '') + ctx.dataset.rawCounts[ctx.dataIndex]
-                    }
-                },
+                tooltip: { enabled: true, displayColors: datasets.length > 1, callbacks: { title: (items) => activeData[items[0].dataIndex]?.answer || '', label: (ctx) => (datasets.length > 1 ? ctx.dataset.label + ': ' : '') + ctx.dataset.rawCounts[ctx.dataIndex] } },
                 datalabels: {
-                    color: '#000',
-                    anchor: 'end',
-                    align: isHorizontal ? 'right' : 'top',
-                    offset: 4,
+                    color: '#000', anchor: 'end', align: isHorizontal ? 'right' : 'top', offset: 4,
                     font: { family: '"Times New Roman", Times, serif', size: 14, weight: 'bold' },
-                    formatter: (value) => {
-                        if (!value || value === 0) return '';
-                        if (value > 0 && value < 1) return '<1%';
-                        return Math.round(value) + '%';
-                    }
+                    formatter: (value) => { if (!value || value === 0) return ''; if (value > 0 && value < 1) return '<1%'; return Math.round(value) + '%'; }
                 }
             },
             scales: {
@@ -1468,24 +1625,15 @@ function drawStackedChart(id) {
     const labels = activeData.map(r => r.answer.length > 50 ? r.answer.substring(0, 50) + '...' : r.answer);
 
     const datasets = dataObj.file_keys.map(fileKey => {
-        const actualPcts = activeData.map(r => {
-            const count = r.counts[fileKey] || 0;
-            const ft = fileTotals[fileKey];
-            return ft > 0 ? (count / ft) * 100 : 0;
-        });
+        const actualPcts = activeData.map(r => { const count = r.counts[fileKey] || 0; const ft = fileTotals[fileKey]; return ft > 0 ? (count / ft) * 100 : 0; });
         const actualCounts = activeData.map(r => r.counts[fileKey] || 0);
         return {
             label: dataObj.file_labels[fileKey],
             backgroundColor: dataObj.file_colors[fileKey],
-            actualPcts,
-            actualCounts,
+            actualPcts, actualCounts,
             data: activeData.map((r, rIdx) => {
                 const pct = actualPcts[rIdx];
-                const answerSum = dataObj.file_keys.reduce((sum, fk) => {
-                    const c = r.counts[fk] || 0;
-                    const ft = fileTotals[fk];
-                    return sum + (ft > 0 ? (c / ft) * 100 : 0);
-                }, 0);
+                const answerSum = dataObj.file_keys.reduce((sum, fk) => { const c = r.counts[fk] || 0; const ft = fileTotals[fk]; return sum + (ft > 0 ? (c / ft) * 100 : 0); }, 0);
                 return answerSum > 0 ? (pct / answerSum) * 100 : 0;
             }),
             barPercentage: 0.7
@@ -1504,50 +1652,28 @@ function drawStackedChart(id) {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    display: !!dataObj.options.showLegend,
-                    position: 'bottom',
-                    labels: { font: { family: '"Times New Roman", Times, serif', size: 12 } }
-                },
-                tooltip: {
-                    enabled: true,
-                    displayColors: datasets.length > 1,
-                    callbacks: {
-                        title: (items) => activeData[items[0].dataIndex]?.answer || '',
-                        label: (ctx) => (datasets.length > 1 ? ctx.dataset.label + ': ' : '') + ctx.dataset.actualCounts[ctx.dataIndex]
-                    }
-                },
+                legend: { display: !!dataObj.options.showLegend, position: 'bottom', labels: { font: { family: '"Times New Roman", Times, serif', size: 12 } } },
+                tooltip: { enabled: true, displayColors: datasets.length > 1, callbacks: { title: (items) => activeData[items[0].dataIndex]?.answer || '', label: (ctx) => (datasets.length > 1 ? ctx.dataset.label + ': ' : '') + ctx.dataset.actualCounts[ctx.dataIndex] } },
                 datalabels: {
-                    color: '#fff',
-                    anchor: 'center',
-                    align: 'center',
+                    color: '#fff', anchor: 'center', align: 'center',
                     font: { family: '"Times New Roman", Times, serif', size: 13, weight: 'bold' },
-                    formatter: (value, context) => {
-                        const pct = context.dataset.actualPcts[context.dataIndex];
-                        if (!pct || pct === 0) return '';
-                        const rounded = Math.round(pct);
-                        return rounded < 1 ? '<1%' : rounded + '%';
-                    }
+                    formatter: (value, context) => { const pct = context.dataset.actualPcts[context.dataIndex]; if (!pct || pct === 0) return ''; const rounded = Math.round(pct); return rounded < 1 ? '<1%' : rounded + '%'; }
                 }
             },
             scales: isVertStacked
-                ? {
-                    x: { stacked: true, grid: { display: false }, border: { display: false } },
-                    y: { stacked: true, display: false, max: 100, grid: { display: false }, border: { display: false } }
-                }
-                : {
-                    x: { stacked: true, display: false, max: 100, grid: { display: false }, border: { display: false } },
-                    y: { stacked: true, grid: { display: false }, border: { display: false } }
-                }
+                ? { x: { stacked: true, grid: { display: false }, border: { display: false } }, y: { stacked: true, display: false, max: 100, grid: { display: false }, border: { display: false } } }
+                : { x: { stacked: true, display: false, max: 100, grid: { display: false }, border: { display: false } }, y: { stacked: true, grid: { display: false }, border: { display: false } } }
         }
     });
 }
+
+// ===================== TABLE RENDER =====================
 
 function renderTable(tableId) {
     const dataObj = window.appData[tableId];
     const tableEl = document.getElementById(tableId);
     if (!tableEl) return;
-    
+
     const isVert = dataObj.options.tableVertical;
     const activeRows = dataObj.data.filter(r => r.included);
 
@@ -1559,14 +1685,13 @@ function renderTable(tableId) {
     const topN = dataObj.options.highlightTop ? Math.min(dataObj.options.topN, activeRows.length) : 0;
     const highlightColor = dataObj.options.highlightColor || '#dc3545';
     let threshold = -1;
-    
+
     if(dataObj.options.highlightTop && activeRows.length > 0) {
         const uniqueCounts = [...new Set(activeRows.map(r => r._total))].sort((a, b) => b - a);
-        threshold = uniqueCounts[Math.min(topN, uniqueCounts.length) - 1]; 
+        threshold = uniqueCounts[Math.min(topN, uniqueCounts.length) - 1];
     }
 
     if (isVert) {
-        // --- ВЕРТИКАЛЬНАЯ ТАБЛИЦА (Файлы = строки, Ответы = столбцы) ---
         const isSingleFileVert = dataObj.file_keys.length === 1;
         let theadHtml1 = isSingleFileVert
             ? `<tr id="thead_row1_${tableId}">`
@@ -1601,7 +1726,7 @@ function renderTable(tableId) {
         }
         theadHtml1 += `</tr>`;
         theadHtml2 += `</tr>`;
-        
+
         tableEl.querySelector('thead').innerHTML = theadHtml1 + theadHtml2;
 
         let tbodyHtml = '';
@@ -1634,11 +1759,10 @@ function renderTable(tableId) {
         });
 
         tableEl.querySelector('tbody').innerHTML = tbodyHtml;
-        tableEl.querySelector('tfoot').innerHTML = ''; 
+        tableEl.querySelector('tfoot').innerHTML = '';
         tableEl.querySelector('tfoot').classList.add('d-none');
 
     } else {
-        // --- ГОРИЗОНТАЛЬНАЯ ТАБЛИЦА (Стандартная: Ответы = строки) ---
         const isSingleFile = dataObj.file_keys.length === 1;
         let theadHtml;
         if (isSingleFile) {
@@ -1648,8 +1772,7 @@ function renderTable(tableId) {
                     <th class="text-start align-middle main-th-${tableId}" style="width: 40%;"><span contenteditable="true" class="editable-cell text-dark" data-id="${tableId}" data-header="h1">${dataObj.headers.h1 || 'Ответ'}</span></th>
                     <th class="text-center count-col-${tableId}"><span contenteditable="true" class="editable-cell text-dark" data-id="${tableId}" data-header="h2">${dataObj.headers.h2 || 'Кол-во ответивших'}</span></th>
                     <th class="text-center pct-col-${tableId}"><span contenteditable="true" class="editable-cell text-dark" data-id="${tableId}" data-header="h3">${dataObj.headers.h3 || '% от числа ответивших'}</span></th>
-                </tr>
-            `;
+                </tr>`;
         } else {
             theadHtml = `
                 <tr id="thead_row1_${tableId}">
@@ -1662,13 +1785,11 @@ function renderTable(tableId) {
                         <th class="text-center count-col-${tableId}"><span contenteditable="true" class="editable-cell text-dark" data-id="${tableId}" data-header="h2">${dataObj.headers.h2 || 'Кол-во ответивших'}</span></th>
                         <th class="text-center pct-col-${tableId}"><span contenteditable="true" class="editable-cell text-dark" data-id="${tableId}" data-header="h3">${dataObj.headers.h3 || '% от числа ответивших'}</span></th>
                     `).join('')}
-                </tr>
-            `;
+                </tr>`;
         }
         tableEl.querySelector('thead').innerHTML = theadHtml;
 
         let tbodyHtml = '';
-        let includedCount = 0;
         dataObj.data.forEach((row, idx) => {
             const isTop = topN > 0 && row.included && row._total >= threshold;
             const trClass = row.included ? (isTop ? 'row-top-highlight' : '') : 'row-excluded';
@@ -1716,124 +1837,44 @@ function renderTable(tableId) {
     applyHiddenColumns(tableId);
 }
 
+// ===================== SETTINGS EVENTS =====================
+
 document.addEventListener('change', (e) => {
-    if (e.target.classList.contains('setting-show-total')) {
-        window.appData[e.target.dataset.id].options.showTotal = e.target.checked;
-        renderTable(e.target.dataset.id);
-    }
-    if (e.target.classList.contains('setting-highlight-top')) {
-        window.appData[e.target.dataset.id].options.highlightTop = e.target.checked;
-        drawChart(e.target.dataset.id);
-        renderTable(e.target.dataset.id);
-    }
+    if (e.target.classList.contains('setting-show-total')) { window.appData[e.target.dataset.id].options.showTotal = e.target.checked; renderTable(e.target.dataset.id); }
+    if (e.target.classList.contains('setting-highlight-top')) { window.appData[e.target.dataset.id].options.highlightTop = e.target.checked; drawChart(e.target.dataset.id); renderTable(e.target.dataset.id); }
     if (e.target.classList.contains('setting-vertical')) {
         const id = e.target.dataset.id;
         window.appData[id].options.tableVertical = e.target.checked;
         window.appData[id].options.chartDirection = e.target.checked ? 'x' : 'y';
-        renderTable(id);
-        drawChart(id);
-        drawStackedChart(id);
+        renderTable(id); drawChart(id); drawStackedChart(id);
     }
-    if (e.target.classList.contains('setting-highlight-color')) {
-        window.appData[e.target.dataset.id].options.highlightColor = e.target.value;
-        drawChart(e.target.dataset.id);
-        renderTable(e.target.dataset.id);
-    }
-    if (e.target.classList.contains('pie-answer-color')) {
-        const id = e.target.dataset.id;
-        window.appData[id].pieColors[parseInt(e.target.dataset.index)] = e.target.value;
-        drawPieChart(id);
-    }
-    if (e.target.classList.contains('bar-answer-color')) {
-        const id = e.target.dataset.id;
-        window.appData[id].barColors[parseInt(e.target.dataset.index)] = e.target.value;
-        drawChart(id);
-    }
-    if (e.target.classList.contains('row-toggle')) {
-        window.appData[e.target.dataset.id].data[parseInt(e.target.dataset.index)].included = e.target.checked;
-        renderTable(e.target.dataset.id);
-        drawChart(e.target.dataset.id);
-        drawStackedChart(e.target.dataset.id);
-        drawPieChart(e.target.dataset.id);
-    }
-    if (e.target.classList.contains('modal-row-toggle')) {
-        const id = e.target.dataset.id;
-        window.appData[id].data[parseInt(e.target.dataset.index)].included = e.target.checked;
-        renderChartEditModal(id);
-        renderTable(id);
-        drawChart(id);
-        drawStackedChart(id);
-        drawPieChart(id);
-    }
-    if (e.target.classList.contains('setting-show-legend')) {
-        const id = e.target.dataset.id;
-        window.appData[id].options.showLegend = e.target.checked;
-        drawChart(id);
-        drawStackedChart(id);
-        drawPieChart(id);
-    }
+    if (e.target.classList.contains('setting-highlight-color')) { window.appData[e.target.dataset.id].options.highlightColor = e.target.value; drawChart(e.target.dataset.id); renderTable(e.target.dataset.id); }
+    if (e.target.classList.contains('pie-answer-color')) { const id = e.target.dataset.id; window.appData[id].pieColors[parseInt(e.target.dataset.index)] = e.target.value; drawPieChart(id); }
+    if (e.target.classList.contains('bar-answer-color')) { const id = e.target.dataset.id; window.appData[id].barColors[parseInt(e.target.dataset.index)] = e.target.value; drawChart(id); }
+    if (e.target.classList.contains('row-toggle')) { window.appData[e.target.dataset.id].data[parseInt(e.target.dataset.index)].included = e.target.checked; renderTable(e.target.dataset.id); drawChart(e.target.dataset.id); drawStackedChart(e.target.dataset.id); drawPieChart(e.target.dataset.id); }
+    if (e.target.classList.contains('modal-row-toggle')) { const id = e.target.dataset.id; window.appData[id].data[parseInt(e.target.dataset.index)].included = e.target.checked; renderChartEditModal(id); renderTable(id); drawChart(id); drawStackedChart(id); drawPieChart(id); }
+    if (e.target.classList.contains('setting-show-legend')) { const id = e.target.dataset.id; window.appData[id].options.showLegend = e.target.checked; drawChart(id); drawStackedChart(id); drawPieChart(id); }
 });
 
 document.addEventListener('input', (e) => {
-    if (e.target.classList.contains('setting-top-n')) {
-        const val = parseInt(e.target.value);
-        if (!isNaN(val) && val >= 1) {
-            window.appData[e.target.dataset.id].options.topN = val;
-            if (window.appData[e.target.dataset.id].options.highlightTop) {
-                drawChart(e.target.dataset.id);
-                renderTable(e.target.dataset.id);
-            }
-        }
-    }
-    if (e.target.classList.contains('answer-text')) {
-        window.appData[e.target.dataset.id].data[parseInt(e.target.dataset.index)].answer = e.target.innerText;
-    }
-    if (e.target.classList.contains('answer-count')) {
-        const val = parseInt(e.target.innerText);
-        if (!isNaN(val)) {
-            const fk = e.target.getAttribute('data-file');
-            const rowData = window.appData[e.target.dataset.id].data[parseInt(e.target.dataset.index)];
-            rowData.counts[fk] = val;
-            rowData._total = Object.values(rowData.counts).reduce((a, b) => a + b, 0);
-        }
-    }
-    if (e.target.hasAttribute('data-header')) {
-        window.appData[e.target.dataset.id].headers[e.target.getAttribute('data-header')] = e.target.innerText;
-    }
-    if (e.target.classList.contains('modal-answer-text')) {
-        window.appData[e.target.dataset.id].data[parseInt(e.target.dataset.index)].answer = e.target.innerText;
-    }
-    if (e.target.classList.contains('modal-answer-count')) {
-        const val = parseInt(e.target.innerText);
-        if (!isNaN(val)) {
-            const fk = e.target.getAttribute('data-file');
-            const rowData = window.appData[e.target.dataset.id].data[parseInt(e.target.dataset.index)];
-            rowData.counts[fk] = val;
-            rowData._total = Object.values(rowData.counts).reduce((a, b) => a + b, 0);
-        }
-    }
+    if (e.target.classList.contains('setting-top-n')) { const val = parseInt(e.target.value); if (!isNaN(val) && val >= 1) { window.appData[e.target.dataset.id].options.topN = val; if (window.appData[e.target.dataset.id].options.highlightTop) { drawChart(e.target.dataset.id); renderTable(e.target.dataset.id); } } }
+    if (e.target.classList.contains('answer-text')) { window.appData[e.target.dataset.id].data[parseInt(e.target.dataset.index)].answer = e.target.innerText; }
+    if (e.target.classList.contains('answer-count')) { const val = parseInt(e.target.innerText); if (!isNaN(val)) { const fk = e.target.getAttribute('data-file'); const rowData = window.appData[e.target.dataset.id].data[parseInt(e.target.dataset.index)]; rowData.counts[fk] = val; rowData._total = Object.values(rowData.counts).reduce((a, b) => a + b, 0); } }
+    if (e.target.hasAttribute('data-header')) { window.appData[e.target.dataset.id].headers[e.target.getAttribute('data-header')] = e.target.innerText; }
+    if (e.target.classList.contains('modal-answer-text')) { window.appData[e.target.dataset.id].data[parseInt(e.target.dataset.index)].answer = e.target.innerText; }
+    if (e.target.classList.contains('modal-answer-count')) { const val = parseInt(e.target.innerText); if (!isNaN(val)) { const fk = e.target.getAttribute('data-file'); const rowData = window.appData[e.target.dataset.id].data[parseInt(e.target.dataset.index)]; rowData.counts[fk] = val; rowData._total = Object.values(rowData.counts).reduce((a, b) => a + b, 0); } }
 });
 
 document.addEventListener('focusout', (e) => {
-    if (e.target.classList.contains('answer-count') || e.target.classList.contains('answer-text') || e.target.hasAttribute('data-header')) {
-        renderTable(e.target.dataset.id);
-        drawChart(e.target.dataset.id);
-        drawStackedChart(e.target.dataset.id);
-        drawPieChart(e.target.dataset.id);
-    }
-    if (e.target.classList.contains('modal-answer-count') || e.target.classList.contains('modal-answer-text')) {
-        const id = e.target.dataset.id;
-        renderChartEditModal(id);
-        renderTable(id);
-        drawChart(id);
-        drawStackedChart(id);
-        drawPieChart(id);
-    }
+    if (e.target.classList.contains('answer-count') || e.target.classList.contains('answer-text') || e.target.hasAttribute('data-header')) { renderTable(e.target.dataset.id); drawChart(e.target.dataset.id); drawStackedChart(e.target.dataset.id); drawPieChart(e.target.dataset.id); }
+    if (e.target.classList.contains('modal-answer-count') || e.target.classList.contains('modal-answer-text')) { const id = e.target.dataset.id; renderChartEditModal(id); renderTable(id); drawChart(id); drawStackedChart(id); drawPieChart(id); }
 });
 
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target.classList.contains('editable-cell')) { e.preventDefault(); e.target.blur(); }
 });
+
+// ===================== ANALYZE FORM =====================
 
 document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1857,9 +1898,22 @@ document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
                 if (subExists) mergedSub[f.clean_filename] = subColName;
             });
         }
-        configs.push({ column: colName, viz_type: ALL_VIZ, file_mapping: window.questionMapping[colName], merged_sub: mergedSub });
+
+        // Найти раздел для этого вопроса
+        const sec = window.questionSections.find(s => s.questions.includes(colName));
+        const sectionInfo = sec
+            ? { name: sec.name, description: sec.description || '', color: sec.color }
+            : null;
+
+        configs.push({
+            column: colName,
+            viz_type: ALL_VIZ,
+            file_mapping: window.questionMapping[colName],
+            merged_sub: mergedSub,
+            section: sectionInfo
+        });
     });
-    const payload = { file_labels: fileLabels, file_colors: fileColors, configs: configs };
+    const payload = { file_labels: fileLabels, file_colors: fileColors, configs };
 
     document.getElementById('analyzeBtn').disabled = true;
     document.getElementById('analyzeSpinner').classList.remove('d-none');
@@ -1916,7 +1970,11 @@ document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
                         </div>
                     </div>`).join('');
 
-                const html = `<h5 class="fw-semibold text-dark mb-2">${item.col_name}</h5><div class="result-item">
+                // Цветовая полоска раздела в заголовке вопроса в отчёте
+                const secInfo = item.section;
+                const sectionBorder = secInfo ? `border-left: 4px solid ${secInfo.color}; padding-left: 8px;` : '';
+
+                const html = `<h5 class="fw-semibold text-dark mb-2" style="${sectionBorder}">${item.col_name}</h5><div class="result-item">
                     <ul class="nav nav-tabs ui-system-font" id="tabs_${id}">
                         <li class="nav-item"><button class="nav-link active viz-tab-btn" data-id="${id}" data-tab="table"><i class="fa-solid fa-table me-1"></i>Таблица</button></li>
                         <li class="nav-item"><button class="nav-link viz-tab-btn" data-id="${id}" data-tab="bar"><i class="fa-solid fa-chart-column me-1"></i>Столбчатая</button></li>
@@ -1924,26 +1982,14 @@ document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
                         <li class="nav-item"><button class="nav-link viz-tab-btn" data-id="${id}" data-tab="pie"><i class="fa-solid fa-chart-pie me-1"></i>Круговая</button></li>
                     </ul>
                     <div class="ui-system-font bg-white p-2 mb-3 border border-top-0 border-secondary-subtle rounded-bottom d-flex flex-wrap gap-3 align-items-center shadow-sm" id="settings_${id}">
-                        <div class="form-check mb-0" data-vis-tabs="table">
-                            <input class="form-check-input setting-show-total" type="checkbox" id="total_${id}" data-id="${id}" checked>
-                            <label class="form-check-label small fw-medium" for="total_${id}"><i class="fa-solid fa-sigma me-1 text-muted"></i>Добавить строку "Всего"</label>
-                        </div>
-                        <div class="form-check form-switch mb-0" data-vis-tabs="table bar">
-                            <input class="form-check-input setting-highlight-top" type="checkbox" id="hl_${id}" data-id="${id}">
-                            <label class="form-check-label small fw-medium" for="hl_${id}"><i class="fa-solid fa-trophy me-1 text-muted"></i>Выделить топ:</label>
-                        </div>
+                        <div class="form-check mb-0" data-vis-tabs="table"><input class="form-check-input setting-show-total" type="checkbox" id="total_${id}" data-id="${id}" checked><label class="form-check-label small fw-medium" for="total_${id}"><i class="fa-solid fa-sigma me-1 text-muted"></i>Добавить строку "Всего"</label></div>
+                        <div class="form-check form-switch mb-0" data-vis-tabs="table bar"><input class="form-check-input setting-highlight-top" type="checkbox" id="hl_${id}" data-id="${id}"><label class="form-check-label small fw-medium" for="hl_${id}"><i class="fa-solid fa-trophy me-1 text-muted"></i>Выделить топ:</label></div>
                         <input type="number" class="form-control form-control-sm setting-top-n" data-id="${id}" value="1" min="1" max="${item.data.length * item.file_keys.length}" style="width: 70px;" data-vis-tabs="table bar">
                         <input type="color" class="form-control form-control-color setting-highlight-color" data-id="${id}" value="#dc3545" style="width:28px;height:28px;padding:1px 2px;cursor:pointer;" title="Цвет выделения топа" data-vis-tabs="table bar">
                         <button type="button" class="btn btn-sm btn-outline-secondary random-highlight-color-btn" data-id="${id}" title="Случайный цвет" data-vis-tabs="table bar"><i class="fa-solid fa-dice-five"></i></button>
                         <div class="vr" data-vis-tabs="table bar"></div>
-                        <div class="form-check form-switch mb-0" data-vis-tabs="table bar stacked">
-                            <input class="form-check-input setting-vertical" type="checkbox" id="vert_${id}" data-id="${id}">
-                            <label class="form-check-label small fw-medium" for="vert_${id}"><i class="fa-solid fa-rotate me-1 text-muted"></i>Вертикальный</label>
-                        </div>
-                        <div class="form-check mb-0" data-vis-tabs="bar stacked pie">
-                            <input class="form-check-input setting-show-legend" type="checkbox" id="legend_${id}" data-id="${id}" ${item.file_keys.length > 1 ? 'checked' : ''}>
-                            <label class="form-check-label small fw-medium" for="legend_${id}"><i class="fa-solid fa-list-ul me-1 text-muted"></i>Легенда</label>
-                        </div>
+                        <div class="form-check form-switch mb-0" data-vis-tabs="table bar stacked"><input class="form-check-input setting-vertical" type="checkbox" id="vert_${id}" data-id="${id}"><label class="form-check-label small fw-medium" for="vert_${id}"><i class="fa-solid fa-rotate me-1 text-muted"></i>Вертикальный</label></div>
+                        <div class="form-check mb-0" data-vis-tabs="bar stacked pie"><input class="form-check-input setting-show-legend" type="checkbox" id="legend_${id}" data-id="${id}" ${item.file_keys.length > 1 ? 'checked' : ''}><label class="form-check-label small fw-medium" for="legend_${id}"><i class="fa-solid fa-list-ul me-1 text-muted"></i>Легенда</label></div>
                         <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" onclick="openHideColModal('${id}')" title="Скрыть столбцы" data-vis-tabs="table"><i class="fa-solid fa-eye-slash"></i></button>
                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="openChartEditModal('${id}')" title="Редактировать данные диаграммы" data-vis-tabs="bar stacked pie"><i class="fa-solid fa-pen"></i></button>
                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="confirmFuzzyMapping('${id}')" title="Сгруппировать похожие ответы"><i class="fa-solid fa-shuffle"></i></button>
@@ -1952,14 +1998,10 @@ document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
                         <div class="mb-3">Таблица ${tNum} – Распределение ответов респондентов на вопрос: «${item.col_name}»</div>
                         <div class="table-responsive mb-4">
                             <table class="table table-bordered table-hover table-custom-border align-middle mb-0" id="${id}">
-                                <thead></thead>
-                                <tbody></tbody>
-                                <tfoot></tfoot>
+                                <thead></thead><tbody></tbody><tfoot></tfoot>
                             </table>
                         </div>
                     </div>
-
-
                     <div id="pane_bar_${id}" class="d-none">
                         <div id="bar_color_editor_${id}"></div>
                         <div class="chart-container mb-2"><canvas id="canvas_${id}"></canvas></div>
@@ -1977,7 +2019,6 @@ document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
                 </div>`;
 
                 reportContent.innerHTML += html;
-                // Apply initial tab visibility (table is active by default)
                 document.getElementById(`settings_${id}`)?.querySelectorAll('[data-vis-tabs]').forEach(el => {
                     el.classList.toggle('d-none', !el.dataset.visTabs.split(' ').includes('table'));
                 });
@@ -1992,6 +2033,8 @@ document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
     }
 });
 
+// ===================== CLICK DELEGATION =====================
+
 function randomColor() {
     return '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
 }
@@ -2001,43 +2044,14 @@ document.addEventListener('click', e => {
         if (currentWizardStep > 0) goToStep(currentWizardStep - 1);
         return;
     }
-
     const rhlBtn = e.target.closest('.random-highlight-color-btn');
-    if (rhlBtn) {
-        const input = document.querySelector(`.setting-highlight-color[data-id="${rhlBtn.dataset.id}"]`);
-        if (input) { input.value = randomColor(); input.dispatchEvent(new Event('change', { bubbles: true })); }
-        return;
-    }
-
+    if (rhlBtn) { const input = document.querySelector(`.setting-highlight-color[data-id="${rhlBtn.dataset.id}"]`); if (input) { input.value = randomColor(); input.dispatchEvent(new Event('change', { bubbles: true })); } return; }
     const rpcBtn = e.target.closest('.random-pie-colors-btn');
-    if (rpcBtn) {
-        const did = rpcBtn.dataset.id;
-        const dataObj = window.appData[did];
-        if (dataObj) {
-            dataObj.pieColors = dataObj.pieColors.map(() => randomColor());
-            window.renderedTabs[did].pie = false;
-            drawPieChart(did);
-        }
-        return;
-    }
-
+    if (rpcBtn) { const did = rpcBtn.dataset.id; const dataObj = window.appData[did]; if (dataObj) { dataObj.pieColors = dataObj.pieColors.map(() => randomColor()); window.renderedTabs[did].pie = false; drawPieChart(did); } return; }
     const rbcBtn = e.target.closest('.random-bar-colors-btn');
-    if (rbcBtn) {
-        const did = rbcBtn.dataset.id;
-        const dataObj = window.appData[did];
-        if (dataObj) {
-            dataObj.barColors = dataObj.barColors.map(() => randomColor());
-            drawChart(did);
-        }
-        return;
-    }
-
+    if (rbcBtn) { const did = rbcBtn.dataset.id; const dataObj = window.appData[did]; if (dataObj) { dataObj.barColors = dataObj.barColors.map(() => randomColor()); drawChart(did); } return; }
     const rLegBtn = e.target.closest('.random-legend-color-btn');
-    if (rLegBtn) {
-        const input = document.querySelector(`.legend-color[data-file="${rLegBtn.dataset.file}"]`);
-        if (input) input.value = randomColor();
-        return;
-    }
+    if (rLegBtn) { const input = document.querySelector(`.legend-color[data-file="${rLegBtn.dataset.file}"]`); if (input) input.value = randomColor(); return; }
 
     const btn = e.target.closest('.viz-tab-btn');
     if (!btn) return;
@@ -2046,44 +2060,22 @@ document.addEventListener('click', e => {
 
     document.querySelectorAll(`#tabs_${id} .viz-tab-btn`).forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-
-    ['table', 'bar', 'stacked', 'pie'].forEach(t => {
-        const pane = document.getElementById(`pane_${t}_${id}`);
-        if (pane) pane.classList.toggle('d-none', t !== tab);
-    });
+    ['table', 'bar', 'stacked', 'pie'].forEach(t => { const pane = document.getElementById(`pane_${t}_${id}`); if (pane) pane.classList.toggle('d-none', t !== tab); });
 
     const settingsEl = document.getElementById(`settings_${id}`);
-    if (settingsEl) {
-        settingsEl.querySelectorAll('[data-vis-tabs]').forEach(el => {
-            const tabs = el.dataset.visTabs.split(' ');
-            el.classList.toggle('d-none', !tabs.includes(tab));
-        });
-    }
+    if (settingsEl) { settingsEl.querySelectorAll('[data-vis-tabs]').forEach(el => { const tabs = el.dataset.visTabs.split(' '); el.classList.toggle('d-none', !tabs.includes(tab)); }); }
 
-    if (tab === 'bar' && !window.renderedTabs[id].bar) {
-        window.renderedTabs[id].bar = true;
-        setTimeout(() => drawChart(id), 50);
-    }
-    if (tab === 'stacked' && !window.renderedTabs[id].stacked) {
-        window.renderedTabs[id].stacked = true;
-        setTimeout(() => drawStackedChart(id), 50);
-    }
-    if (tab === 'pie' && !window.renderedTabs[id].pie) {
-        window.renderedTabs[id].pie = true;
-        setTimeout(() => drawPieChart(id), 50);
-    }
+    if (tab === 'bar' && !window.renderedTabs[id].bar) { window.renderedTabs[id].bar = true; setTimeout(() => drawChart(id), 50); }
+    if (tab === 'stacked' && !window.renderedTabs[id].stacked) { window.renderedTabs[id].stacked = true; setTimeout(() => drawStackedChart(id), 50); }
+    if (tab === 'pie' && !window.renderedTabs[id].pie) { window.renderedTabs[id].pie = true; setTimeout(() => drawPieChart(id), 50); }
 });
 
-// ===================== ЭКСПОРТ ДАННЫХ ДЛЯ ИИ =====================
-document.getElementById('downloadCleanedBtn').addEventListener('click', async () => {
-    const ids = Object.keys(window.appData || {}).sort((a, b) =>
-        parseInt(a.split('_')[1]) - parseInt(b.split('_')[1])
-    );
+// ===================== ЭКСПОРТ =====================
 
-    if (ids.length === 0) {
-        showToast('Нет данных для экспорта. Сначала постройте отчёт на шаге 4.', 'danger');
-        return;
-    }
+document.getElementById('downloadCleanedBtn').addEventListener('click', async () => {
+    const ids = Object.keys(window.appData || {}).sort((a, b) => parseInt(a.split('_')[1]) - parseInt(b.split('_')[1]));
+
+    if (ids.length === 0) { showToast('Нет данных для экспорта. Сначала постройте отчёт на шаге 4.', 'danger'); return; }
 
     const questions = [];
     let tableNum = 1;
@@ -2100,6 +2092,9 @@ document.getElementById('downloadCleanedBtn').addEventListener('click', async ()
             fileTotals[fk] = dataObj.data.reduce((sum, r) => sum + (r.counts[fk] || 0), 0);
         });
 
+        // Найти раздел из window.questionSections по имени вопроса
+        const sec = window.questionSections.find(s => s.questions.includes(dataObj.question_name));
+
         questions.push({
             table_num: tableNum++,
             question_name: dataObj.question_name,
@@ -2108,19 +2103,14 @@ document.getElementById('downloadCleanedBtn').addEventListener('click', async ()
             h3: dataObj.headers.h3 || '% от числа ответивших',
             file_keys: dataObj.file_keys,
             file_labels: dataObj.file_labels,
-            rows: activeRows.map(r => ({
-                answer: String(r.answer),
-                counts: Object.fromEntries(dataObj.file_keys.map(fk => [fk, r.counts[fk] || 0]))
-            })),
+            rows: activeRows.map(r => ({ answer: String(r.answer), counts: Object.fromEntries(dataObj.file_keys.map(fk => [fk, r.counts[fk] || 0])) })),
             file_totals: fileTotals,
-            show_total: dataObj.options.showTotal !== false
+            show_total: dataObj.options.showTotal !== false,
+            section: sec ? { name: sec.name, description: sec.description || '', color: sec.color } : null
         });
     });
 
-    if (questions.length === 0) {
-        showToast('Все строки исключены — нечего экспортировать.', 'danger');
-        return;
-    }
+    if (questions.length === 0) { showToast('Все строки исключены — нечего экспортировать.', 'danger'); return; }
 
     const btn = document.getElementById('downloadCleanedBtn');
     const origHtml = btn.innerHTML;

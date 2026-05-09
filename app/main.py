@@ -6,9 +6,13 @@ from fastapi.responses import JSONResponse, Response
 import pandas as pd
 import os
 
+import json
+import asyncio
+from fastapi.responses import StreamingResponse
+
 from app.data_logic import clean_dataframe, generate_report_data, get_column_groups, is_system_column
 from app.schemas import ProcessSheetsRequest, AnalyzeRequest, ExportDocxRequest
-from app.docx_gen_all import generate_docx
+from app.docx_gen import generate_docx
 
 app = FastAPI(title="Система аналитики опросов МГУ им. Огарева")
 
@@ -94,14 +98,54 @@ async def analyze_data(request: AnalyzeRequest):
     results = generate_report_data(UPLOAD_DIR, request)
     return {"results": results}
 
+@app.post("/export_docx_stream")
+async def export_docx_stream(request: ExportDocxRequest):
+    import base64
+
+    questions = [q.model_dump() for q in request.questions]
+
+    async def event_generator():
+        loop = asyncio.get_event_loop()
+        queue = asyncio.Queue()
+
+        def progress_cb(current, total, label):
+            loop.call_soon_threadsafe(
+                queue.put_nowait,
+                {"type": "progress", "current": current, "total": total, "label": label}
+            )
+
+        def run_generate():
+            try:
+                data_bytes, analysis_bytes = generate_docx(questions, progress_callback=progress_cb)
+                loop.call_soon_threadsafe(queue.put_nowait, {
+                    "type": "done",
+                    "data": base64.b64encode(data_bytes).decode(),
+                    "analysis": base64.b64encode(analysis_bytes).decode()
+                })
+            except Exception as e:
+                loop.call_soon_threadsafe(queue.put_nowait, {"type": "error", "message": str(e)})
+
+        import threading
+        threading.Thread(target=run_generate, daemon=True).start()
+
+        while True:
+            msg = await queue.get()
+            yield f"data: {json.dumps(msg, ensure_ascii=False)}\n\n"
+            if msg["type"] in ("done", "error"):
+                break
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
 @app.post("/export_docx")
 async def export_docx(request: ExportDocxRequest):
+    """Синхронная версия (запасная) — возвращает только файл данных."""
     try:
-        docx_bytes = generate_docx([q.model_dump() for q in request.questions])
+        data_bytes, _ = generate_docx([q.model_dump() for q in request.questions])
         return Response(
-            content=docx_bytes,
+            content=data_bytes,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            headers={"Content-Disposition": "attachment; filename=report.docx"}
+            headers={"Content-Disposition": "attachment; filename=report_data.docx"}
         )
     except Exception as e:
         return JSONResponse(status_code=400, content={"message": f"Ошибка генерации документа: {str(e)}"})

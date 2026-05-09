@@ -187,3 +187,34 @@ th:hover .row-toggle-container, th.col-excluded .row-toggle-container { opacity:
 
 #chartEditModal { pointer-events: none !important; background: transparent !important; }
 #chartEditModal .modal-dialog { pointer-events: auto;  }
+
+/* ===================== RESPONSIVE ===================== */
+@media (max-width: 1200px) {
+    .wizard-card { max-width: 95%; padding: 1.5rem 1.5rem; }
+    .wizard-card-wide { max-width: 98%; }
+}
+
+@media (max-width: 768px) {
+    .wizard-step { padding: 1rem 0.5rem 0.5rem; }
+    .wizard-card { max-width: 100%; padding: 1.25rem 1rem; border-radius: 10px; min-height: unset; }
+    .wizard-card-wide { max-width: 100%; }
+    .wizard-nav-bar { padding: 0 0.75rem; height: auto; min-height: 60px; flex-wrap: wrap; gap: 6px; padding-top: 8px; padding-bottom: 8px; }
+    .nav-fwd-btn { min-width: unset; font-size: 0.85rem; padding: 0.4rem 0.8rem; }
+    #navBackBtn { min-width: unset; font-size: 0.85rem; }
+    .step-dots { gap: 5px; }
+    .step-dot { width: 8px; height: 8px; }
+    .step-dot.active { width: 20px; }
+    .wizard-step-title { font-size: 1rem; }
+    .chart-container { max-width: 100%; }
+    .pie-container { max-width: 100%; }
+    #reportContent { font-size: 11pt; }
+    #reportContent table { font-size: 9pt; }
+    .legend-label { min-width: 120px !important; }
+}
+
+@media (max-width: 480px) {
+    .wizard-card { padding: 1rem 0.75rem; }
+    .upload-dropzone { padding: 2rem 1rem 1.5rem; }
+    .wizard-step-header { gap: 0.5rem; margin-bottom: 1rem; }
+    .wizard-step-num { width: 28px; height: 28px; font-size: 0.85rem; }
+}

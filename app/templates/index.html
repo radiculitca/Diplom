@@ -291,15 +291,23 @@
                 Скорми этот файл ИИшке (Очищенные данные выбранных вопросов с
                 учётом того, что ты натыкал в прошлых шагах)
               </p>
-              <div class="d-flex justify-content-center">
+              <div class="d-flex flex-column align-items-center gap-3">
                 <button
-                  type="button"
-                  class="btn btn-success btn-lg px-5"
-                  id="downloadCleanedBtn"
+                    type="button"
+                    class="btn btn-success btn-lg px-5"
+                    id="downloadCleanedBtn"
                 >
-                  <i class="fa-solid fa-file-arrow-down me-2"></i>Скачать
-                  очищенные данные
+                    <i class="fa-solid fa-file-arrow-down me-2"></i>Скачать очищенные данные
                 </button>
+
+                <div id="exportProgressContainer" class="d-none" style="width:100%;max-width:500px;">
+                    <div class="progress mb-1" style="height:18px;border-radius:8px;">
+                        <div id="exportProgressBar"
+                            class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                            role="progressbar" style="width:0%;font-size:0.72rem;"></div>
+                    </div>
+                    <small id="exportProgressLabel" class="text-muted d-block text-center text-truncate"></small>
+                </div>
               </div>
             </div>
           </div>

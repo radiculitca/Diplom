@@ -2192,33 +2192,85 @@ document.getElementById('downloadCleanedBtn').addEventListener('click', async ()
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Генерация...';
 
+    // Показать прогресс-бар
+    const progressContainer = document.getElementById('exportProgressContainer');
+    const progressBar = document.getElementById('exportProgressBar');
+    const progressLabel = document.getElementById('exportProgressLabel');
+    if (progressContainer) progressContainer.classList.remove('d-none');
+    if (progressBar) { progressBar.style.width = '0%'; progressBar.textContent = ''; }
+    if (progressLabel) progressLabel.textContent = 'Подготовка...';
+
     try {
-        const response = await fetch('/export_docx', {
+        const response = await fetch('/export_docx_stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ questions })
         });
 
-        if (response.ok) {
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'report_cleaned.docx';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            showToast(`Экспортировано ${questions.length} таблиц(ы)`, 'success');
-        } else {
+        if (!response.ok) {
             const data = await response.json();
             showToast(data.message || 'Ошибка генерации документа', 'danger');
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop(); // неполная строка
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const msg = JSON.parse(line.slice(6));
+
+                if (msg.type === 'progress') {
+                    const pct = Math.round((msg.current / msg.total) * 100);
+                    if (progressBar) { progressBar.style.width = pct + '%'; progressBar.textContent = `${msg.current}/${msg.total}`; }
+                    if (progressLabel) progressLabel.textContent = `Раздел ${msg.current} из ${msg.total}: ${msg.label}`;
+                }
+
+                if (msg.type === 'done') {
+                    // Скачать файл данных
+                    const dataBytes = Uint8Array.from(atob(msg.data), c => c.charCodeAt(0));
+                    const dataBlob = new Blob([dataBytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+                    const dataUrl = URL.createObjectURL(dataBlob);
+                    const a1 = document.createElement('a');
+                    a1.href = dataUrl; a1.download = 'report_data.docx';
+                    document.body.appendChild(a1); a1.click();
+                    document.body.removeChild(a1); URL.revokeObjectURL(dataUrl);
+
+                    // Небольшая задержка чтобы браузер не блокировал второе скачивание
+                    await new Promise(r => setTimeout(r, 400));
+
+                    // Скачать файл аналитики
+                    const analysisBytes = Uint8Array.from(atob(msg.analysis), c => c.charCodeAt(0));
+                    const analysisBlob = new Blob([analysisBytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+                    const analysisUrl = URL.createObjectURL(analysisBlob);
+                    const a2 = document.createElement('a');
+                    a2.href = analysisUrl; a2.download = 'report_analysis.docx';
+                    document.body.appendChild(a2); a2.click();
+                    document.body.removeChild(a2); URL.revokeObjectURL(analysisUrl);
+
+                    showToast(`Готово: скачано 2 файла (данные + аналитика)`, 'success');
+                }
+
+                if (msg.type === 'error') {
+                    showToast(msg.message || 'Ошибка генерации', 'danger');
+                }
+            }
         }
     } catch (err) {
         showToast('Ошибка соединения с сервером', 'danger');
     } finally {
         btn.disabled = false;
         btn.innerHTML = origHtml;
+        if (progressContainer) setTimeout(() => progressContainer.classList.add('d-none'), 2000);
     }
 });
 

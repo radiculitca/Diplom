@@ -307,6 +307,7 @@
                             role="progressbar" style="width:0%;font-size:0.72rem;"></div>
                     </div>
                     <small id="exportProgressLabel" class="text-muted d-block text-center text-truncate"></small>
+                    <small id="exportTimerLabel" class="text-muted d-block text-center mt-1" style="font-variant-numeric:tabular-nums;letter-spacing:0.05em;">00:00</small>
                 </div>
               </div>
             </div>
@@ -513,13 +514,12 @@
             ></div>
           </div>
           <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-secondary"
-              data-bs-dismiss="modal"
-            >
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
               <i class="fa-solid fa-xmark me-1"></i>Отмена
             </button>
+            <button type="button" class="btn btn-primary" id="mergePickConfirmBtn" disabled>
+              <i class="fa-solid fa-check me-1"></i>Применить
+            </button>            
           </div>
         </div>
       </div>

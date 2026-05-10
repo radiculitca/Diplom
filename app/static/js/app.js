@@ -303,6 +303,7 @@ function _refreshSectionColors() {
 
 // Открытие модалки выбора подвопроса
 let _mergePickMainName = null;
+let _mergePendingSelection = null;
 
 document.getElementById('mergeQuestionsList').addEventListener('click', e => {
     const addBtn = e.target.closest('.merge-add-btn');
@@ -340,15 +341,22 @@ function _renderMergePickList(query) {
         return;
     }
 
+    _mergePendingSelection = null;
+    document.getElementById('mergePickConfirmBtn').disabled = true;
+
     filtered.forEach(col => {
         const item = document.createElement('div');
         item.className = 'list-group-item list-group-item-action py-2 merge-pick-item';
         item.dataset.colname = col.name;
         item.innerHTML = `<span class="fw-medium">${col.name}</span>`;
         item.addEventListener('click', () => {
-            window.questionMerges[_mergePickMainName] = col.name;
-            _refreshMergeRowStates();
-            bootstrap.Modal.getInstance(document.getElementById('mergePickModal')).hide();
+            // Снять выделение со всех, выделить текущий
+            list.querySelectorAll('.merge-pick-item').forEach(el => {
+                el.classList.remove('active', 'list-group-item-primary');
+            });
+            item.classList.add('active', 'list-group-item-primary');
+            _mergePendingSelection = col.name;
+            document.getElementById('mergePickConfirmBtn').disabled = false;
         });
         list.appendChild(item);
     });
@@ -366,6 +374,13 @@ document.getElementById('toStep3Btn').addEventListener('click', () => {
     _applyMergestoProcessedFiles();
     renderQuestionsStep3();
     goToStep(3);
+});
+
+document.getElementById('mergePickConfirmBtn').addEventListener('click', () => {
+    if (!_mergePendingSelection) return;
+    window.questionMerges[_mergePickMainName] = _mergePendingSelection;
+    _refreshMergeRowStates();
+    bootstrap.Modal.getInstance(document.getElementById('mergePickModal')).hide();
 });
 
 function _applyMergestoProcessedFiles() {
@@ -1458,11 +1473,15 @@ window.openMergeAnswerModal = function(tableId, sourceIdx) {
             <span class="flex-grow-1">${row.answer}</span>
             <span class="badge bg-secondary">${row._total}</span>`;
         item.addEventListener('click', () => {
-            list.querySelectorAll('.list-group-item').forEach(el => el.classList.remove('active'));
+            list.querySelectorAll('.list-group-item').forEach(el => {
+                el.classList.remove('active');
+                el.style.background = '';
+            });
             item.classList.add('active');
+            item.style.background = '#cfe2ff';
             _mergeAnswerTargetIdx = idx;
             document.getElementById('mergeAnswerConfirmBtn').disabled = false;
-        });
+        });        
         list.appendChild(item);
     });
 
@@ -1744,7 +1763,9 @@ function renderTable(tableId) {
 
     const totals = {};
     dataObj.file_keys.forEach(fk => {
-        totals[fk] = dataObj.data.reduce((sum, r) => sum + (r.counts[fk] || 0), 0);
+        totals[fk] = dataObj.data
+            .filter(r => r.included)
+            .reduce((sum, r) => sum + (r.counts[fk] || 0), 0);
     });
 
     const topN = dataObj.options.highlightTop ? Math.min(dataObj.options.topN, activeRows.length) : 0;
@@ -2198,7 +2219,17 @@ document.getElementById('downloadCleanedBtn').addEventListener('click', async ()
     const progressLabel = document.getElementById('exportProgressLabel');
     if (progressContainer) progressContainer.classList.remove('d-none');
     if (progressBar) { progressBar.style.width = '0%'; progressBar.textContent = ''; }
-    if (progressLabel) progressLabel.textContent = 'Подготовка...';
+    if (progressLabel) progressLabel.textContent = '';
+
+    // Таймер
+    let _exportStartTime = Date.now();
+    let _exportTimerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - _exportStartTime) / 1000);
+        const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
+        const s = (elapsed % 60).toString().padStart(2, '0');
+        const timerEl = document.getElementById('exportTimerLabel');
+        if (timerEl) timerEl.textContent = `${m}:${s}`;
+    }, 1000);
 
     try {
         const response = await fetch('/export_docx_stream', {
@@ -2270,6 +2301,7 @@ document.getElementById('downloadCleanedBtn').addEventListener('click', async ()
     } finally {
         btn.disabled = false;
         btn.innerHTML = origHtml;
+        clearInterval(_exportTimerInterval); 
         if (progressContainer) setTimeout(() => progressContainer.classList.add('d-none'), 2000);
     }
 });

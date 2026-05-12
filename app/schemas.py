@@ -52,3 +52,5 @@ class ExportQuestion(BaseModel):
 
 class ExportDocxRequest(BaseModel):
     questions: List[ExportQuestion]
+    provider: str = "ollama"
+    api_key: str = ""

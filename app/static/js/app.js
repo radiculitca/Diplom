@@ -2168,29 +2168,22 @@ document.addEventListener('click', e => {
 
 // ===================== ЭКСПОРТ =====================
 
-document.getElementById('downloadCleanedBtn').addEventListener('click', async () => {
+async function _doExport(provider, apiKey) {
     const ids = Object.keys(window.appData || {}).sort((a, b) => parseInt(a.split('_')[1]) - parseInt(b.split('_')[1]));
-
     if (ids.length === 0) { showToast('Нет данных для экспорта. Сначала постройте отчёт на шаге 4.', 'danger'); return; }
 
     const questions = [];
     let tableNum = 1;
-
     ids.forEach(id => {
         const dataObj = window.appData[id];
         if (!dataObj) return;
-
         const activeRows = dataObj.data.filter(r => r.included !== false);
         if (activeRows.length === 0) return;
-
         const fileTotals = {};
         dataObj.file_keys.forEach(fk => {
             fileTotals[fk] = dataObj.data.reduce((sum, r) => sum + (r.counts[fk] || 0), 0);
         });
-
-        // Найти раздел из window.questionSections по имени вопроса
         const sec = window.questionSections.find(s => s.questions.includes(dataObj.question_name));
-
         questions.push({
             table_num: tableNum++,
             question_name: dataObj.question_name,
@@ -2208,12 +2201,16 @@ document.getElementById('downloadCleanedBtn').addEventListener('click', async ()
 
     if (questions.length === 0) { showToast('Все строки исключены — нечего экспортировать.', 'danger'); return; }
 
-    const btn = document.getElementById('downloadCleanedBtn');
-    const origHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Генерация...';
 
-    // Показать прогресс-бар
+
+    const btnLocal = document.getElementById('downloadLocalBtn');
+    const btnApi = document.getElementById('downloadApiBtn');
+    const activeBtn = provider === 'openrouter' ? btnApi : btnLocal;
+    const origHtml = activeBtn.innerHTML;
+    btnLocal.disabled = true;
+    btnApi.disabled = true;
+    activeBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Генерация...';
+
     const progressContainer = document.getElementById('exportProgressContainer');
     const progressBar = document.getElementById('exportProgressBar');
     const progressLabel = document.getElementById('exportProgressLabel');
@@ -2221,7 +2218,6 @@ document.getElementById('downloadCleanedBtn').addEventListener('click', async ()
     if (progressBar) { progressBar.style.width = '0%'; progressBar.textContent = ''; }
     if (progressLabel) progressLabel.textContent = '';
 
-    // Таймер
     let _exportStartTime = Date.now();
     let _exportTimerInterval = setInterval(() => {
         const elapsed = Math.floor((Date.now() - _exportStartTime) / 1000);
@@ -2235,7 +2231,7 @@ document.getElementById('downloadCleanedBtn').addEventListener('click', async ()
         const response = await fetch('/export_docx_stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ questions })
+            body: JSON.stringify({ questions, provider, api_key: apiKey })
         });
 
         if (!response.ok) {
@@ -2252,9 +2248,8 @@ document.getElementById('downloadCleanedBtn').addEventListener('click', async ()
             const { done, value } = await reader.read();
             if (done) break;
             buffer += decoder.decode(value, { stream: true });
-
             const lines = buffer.split('\n\n');
-            buffer = lines.pop(); // неполная строка
+            buffer = lines.pop();
 
             for (const line of lines) {
                 if (!line.startsWith('data: ')) continue;
@@ -2263,11 +2258,10 @@ document.getElementById('downloadCleanedBtn').addEventListener('click', async ()
                 if (msg.type === 'progress') {
                     const pct = Math.round((msg.current / msg.total) * 100);
                     if (progressBar) { progressBar.style.width = pct + '%'; progressBar.textContent = `${msg.current}/${msg.total}`; }
-                    if (progressLabel) progressLabel.textContent = `Раздел ${msg.current} из ${msg.total}: ${msg.label}`;
+                    if (progressLabel) progressLabel.textContent = `Вопрос ${msg.current} из ${msg.total}: ${msg.label}`;
                 }
 
                 if (msg.type === 'done') {
-                    // Скачать файл данных
                     const dataBytes = Uint8Array.from(atob(msg.data), c => c.charCodeAt(0));
                     const dataBlob = new Blob([dataBytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
                     const dataUrl = URL.createObjectURL(dataBlob);
@@ -2276,10 +2270,8 @@ document.getElementById('downloadCleanedBtn').addEventListener('click', async ()
                     document.body.appendChild(a1); a1.click();
                     document.body.removeChild(a1); URL.revokeObjectURL(dataUrl);
 
-                    // Небольшая задержка чтобы браузер не блокировал второе скачивание
                     await new Promise(r => setTimeout(r, 400));
 
-                    // Скачать файл аналитики
                     const analysisBytes = Uint8Array.from(atob(msg.analysis), c => c.charCodeAt(0));
                     const analysisBlob = new Blob([analysisBytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
                     const analysisUrl = URL.createObjectURL(analysisBlob);
@@ -2288,7 +2280,7 @@ document.getElementById('downloadCleanedBtn').addEventListener('click', async ()
                     document.body.appendChild(a2); a2.click();
                     document.body.removeChild(a2); URL.revokeObjectURL(analysisUrl);
 
-                    showToast(`Готово: скачано 2 файла (данные + аналитика)`, 'success');
+                    showToast('Готово: скачано 2 файла (данные + аналитика)', 'success');
                 }
 
                 if (msg.type === 'error') {
@@ -2299,11 +2291,20 @@ document.getElementById('downloadCleanedBtn').addEventListener('click', async ()
     } catch (err) {
         showToast('Ошибка соединения с сервером', 'danger');
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = origHtml;
-        clearInterval(_exportTimerInterval); 
+        btnLocal.disabled = false;
+        btnApi.disabled = false;
+        activeBtn.innerHTML = origHtml;
+        clearInterval(_exportTimerInterval);
         if (progressContainer) setTimeout(() => progressContainer.classList.add('d-none'), 2000);
     }
+}
+
+document.getElementById('downloadLocalBtn').addEventListener('click', () => {
+    _doExport('ollama', '');
+});
+
+document.getElementById('downloadApiBtn').addEventListener('click', () => {
+    _doExport('openrouter', '');
 });
 
 initTooltips();

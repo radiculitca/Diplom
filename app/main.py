@@ -116,7 +116,12 @@ async def export_docx_stream(request: ExportDocxRequest):
 
         def run_generate():
             try:
-                data_bytes, analysis_bytes = generate_docx(questions, progress_callback=progress_cb)
+                data_bytes, analysis_bytes = generate_docx(
+                    questions,
+                    progress_callback=progress_cb,
+                    provider=request.provider,
+                    api_key=request.api_key,
+                )
                 loop.call_soon_threadsafe(queue.put_nowait, {
                     "type": "done",
                     "data": base64.b64encode(data_bytes).decode(),

@@ -7,3 +7,5 @@ openpyxl
 pyarrow
 python-docx
 ollama
+openai
+dotenv

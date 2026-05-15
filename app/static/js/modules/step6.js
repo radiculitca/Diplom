@@ -2,11 +2,6 @@
 
 async function _doExport() {
     const sections = window.reportSections || [];
-    if (sections.length === 0) {
-        showToast('Нет разделов. Настройте структуру отчёта на шаге 4.', 'danger');
-        return;
-    }
-
     if (!window.appData || Object.keys(window.appData).length === 0) {
         showToast('Нет данных анализа. Сначала запустите анализ на шаге 5.', 'danger');
         return;
@@ -22,11 +17,15 @@ async function _doExport() {
     const questions = [];
     let tableNum = 1;
 
+    const processedQNames = new Set();
+
+    // Из разделов
     for (const sec of sections) {
         for (const qEntry of (sec.questions || [])) {
-            const qName = qEntry.qName;  // { qName, visualize }
+            const qName = qEntry.qName;
             const id = nameToId[qName];
-            if (!id) continue; // вопрос не был проанализирован — пропускаем
+            if (!id || processedQNames.has(qName)) continue;
+            processedQNames.add(qName);
 
             const dataObj = window.appData[id];
             const activeRows = dataObj.data.filter(r => r.included !== false);
@@ -38,8 +37,9 @@ async function _doExport() {
             });
 
             const opts = dataObj.options || {};
+            const includeInReport = dataObj.includeInReport !== false;
             let vizTab = null;
-            if (qEntry.visualize) {
+            if (includeInReport) {
                 const activeBtn = document.querySelector(`#tabs_${id} .viz-tab-btn.active`);
                 vizTab = activeBtn ? activeBtn.dataset.tab : 'table';
             }
@@ -65,6 +65,50 @@ async function _doExport() {
                 hidden_col: opts.hiddenCol || 'none',
             });
         }
+    }
+
+    // Нераспределённые вопросы (без раздела)
+    for (const [id, dataObj] of Object.entries(window.appData)) {
+        const qName = dataObj.question_name;
+        if (processedQNames.has(qName)) continue;
+        processedQNames.add(qName);
+
+        const activeRows = dataObj.data.filter(r => r.included !== false);
+        if (activeRows.length === 0) continue;
+
+        const fileTotals = {};
+        dataObj.file_keys.forEach(fk => {
+            fileTotals[fk] = dataObj.data.reduce((sum, r) => sum + (r.counts[fk] || 0), 0);
+        });
+
+        const opts = dataObj.options || {};
+        const includeInReport = dataObj.includeInReport !== false;
+        let vizTab = null;
+        if (includeInReport) {
+            const activeBtn = document.querySelector(`#tabs_${id} .viz-tab-btn.active`);
+            vizTab = activeBtn ? activeBtn.dataset.tab : 'table';
+        }
+
+        questions.push({
+            table_num: tableNum++,
+            question_name: dataObj.question_name,
+            h1: dataObj.headers.h1 || 'Ответ',
+            h2: dataObj.headers.h2 || 'Кол-во ответивших',
+            h3: dataObj.headers.h3 || '% от числа ответивших',
+            file_keys: dataObj.file_keys,
+            file_labels: dataObj.file_labels,
+            rows: activeRows.map(r => ({
+                answer: String(r.answer),
+                counts: Object.fromEntries(dataObj.file_keys.map(fk => [fk, r.counts[fk] || 0]))
+            })),
+            file_totals: fileTotals,
+            show_total: opts.showTotal !== false,
+            section: null,  // без раздела
+            viz_tab: vizTab,
+            chart_direction: opts.chartDirection || 'y',
+            show_legend: opts.showLegend !== false,
+            hidden_col: opts.hiddenCol || 'none',
+        });
     }
 
     if (questions.length === 0) {

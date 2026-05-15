@@ -15,9 +15,11 @@ function _getAssignedQNames() {
 function _updateToStep5Btn() {
     const btn = document.getElementById('toStep5Btn');
     if (!btn) return;
-    const empty = !window.reportSections || !window.reportSections.length;
-    btn.disabled = empty;
-    btn.title = empty ? 'Создайте хотя бы один раздел на шаге 4' : '';
+    const hasAnything = (window.reportSections && window.reportSections.length > 0)
+        || document.querySelectorAll('#availableQuestionsList .available-q-item').length > 0
+        || document.querySelectorAll('#sortableQuestionsList .question-item').length > 0;
+    btn.disabled = !hasAnything;
+    btn.title = hasAnything ? '' : 'Выберите вопросы на шаге 3';
 }
 
 function renderStep4() {
@@ -99,12 +101,11 @@ function _buildSectionQuestionHtml(sectionId, q) {
     const mappingBtn = multiFile
         ? `<button type="button" class="section-q-action section-q-mapping-btn${missing ? ' text-danger' : ''}" data-qname="${_escAttr(q.qName)}" title="${missing ? 'Вопрос не соотнесён во всех файлах — нажмите, чтобы исправить' : 'Соотнести вручную'}"><i class="fa-solid fa-link"></i></button>`
         : '';
-    const itemClass = missing ? ' q-item-missing' : (q.visualize ? ' q-item-viz' : '');
+    const itemClass = missing ? ' q-item-missing' : '';
     return `
     <div class="section-question-item${itemClass}" data-qname="${_escAttr(q.qName)}" data-section-id="${_escAttr(sectionId)}">
         <span class="section-q-drag" title="Переместить"><i class="fa-solid fa-grip-lines"></i></span>
         <span class="flex-grow-1 text-truncate small fw-medium" title="${_escAttr(q.qName)}">${_escHtml(q.qName)}</span>
-        <button type="button" class="section-q-viz-btn ${q.visualize ? 'active' : ''}" data-qname="${_escAttr(q.qName)}" data-section-id="${_escAttr(sectionId)}" title="${q.visualize ? 'Визуализируется (нажмите, чтобы отключить)' : 'Добавить визуализацию'}"><i class="fa-solid fa-chart-line"></i></button>
         ${mappingBtn}
         <button type="button" class="section-q-remove-btn" data-qname="${_escAttr(q.qName)}" data-section-id="${_escAttr(sectionId)}" title="Убрать из раздела">−</button>
     </div>`;
@@ -260,21 +261,7 @@ document.getElementById('sectionsList').addEventListener('click', e => {
     const mapBtn = e.target.closest('.section-q-mapping-btn');
     if (mapBtn) { openMappingModal(mapBtn.dataset.qname); return; }
 
-    const vizBtn = e.target.closest('.section-q-viz-btn');
-    if (vizBtn) {
-        const sec = window.reportSections.find(s => s.id === vizBtn.dataset.sectionId);
-        if (!sec) return;
-        const q = sec.questions.find(q => q.qName === vizBtn.dataset.qname);
-        if (!q) return;
-        q.visualize = !q.visualize;
-        vizBtn.classList.toggle('active', q.visualize);
-        vizBtn.title = q.visualize ? 'Визуализируется (нажмите, чтобы отключить)' : 'Добавить визуализацию';
-        const row = vizBtn.closest('.section-question-item');
-        if (row && !row.classList.contains('q-item-missing')) {
-            row.classList.toggle('q-item-viz', q.visualize);
-        }
-        return;
-    }
+    
 });
 
 // Модалка добавления раздела

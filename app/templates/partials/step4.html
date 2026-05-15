@@ -1,0 +1,25 @@
+<!-- ШАГ 5: Визуализация -->
+<div class="wizard-step" id="wizardStep4">
+    <div class="wizard-card">
+        <div class="wizard-step-header">
+            <span class="wizard-step-num">5</span>
+            <h4 class="wizard-step-title">Визуализация</h4>
+            <span class="step-help-icon ms-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-title="Нажмите «Построить отчёт» для генерации таблиц и диаграмм по выбранным вопросам. Данные можно редактировать, объединять ответы и настраивать внешний вид графиков."><i class="fa-regular fa-circle-question"></i></span>
+        </div>
+        <!-- Легенда (перенесена с шага 4) -->
+        <div class="mb-3 p-3 border rounded bg-light" id="legendSettingsBlock" style="display:none">
+            <h6 class="fw-bold mb-2">
+                <i class="fa-solid fa-palette me-2"></i>Настройки отображения файлов (Легенда):
+            </h6>
+            <div id="legendInputsContainer" class="d-flex flex-wrap gap-3"></div>
+        </div>
+        <!-- Кнопка построения -->
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <div class="spinner-border text-primary d-none spinner-app" id="analyzeSpinner"></div>
+            <button type="button" class="btn btn-primary" id="analyzeBtn">
+                <i class="fa-solid fa-chart-bar me-1"></i>Построить
+            </button>
+        </div>
+        <div id="reportContent"></div>
+    </div>
+</div>

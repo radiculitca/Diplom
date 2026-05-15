@@ -1,0 +1,23 @@
+<!-- ШАГ 1: Загрузка -->
+<div class="wizard-step" id="wizardStep0">
+    <div class="wizard-card">
+        <div class="wizard-step-header">
+            <span class="wizard-step-num">1</span>
+            <h4 class="wizard-step-title">Загрузка результатов анкетирования</h4>
+            <span class="step-help-icon ms-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-title="Загрузите один или несколько Excel-файлов с результатами анкетирования."><i class="fa-regular fa-circle-question"></i></span>
+        </div>
+        <form id="uploadForm">
+            <div id="dropZone" class="upload-dropzone">
+                <i class="fa-solid fa-cloud-arrow-up fa-3x mb-3 upload-icon"></i>
+                <p class="upload-title">Перетащите файлы сюда</p>
+                <p class="upload-or">или</p>
+                <label class="btn btn-primary btn-lg px-4 mb-3" for="excelFile">
+                    <i class="fa-solid fa-folder-open me-2"></i>Выбрать файлы
+                </label>
+                <input class="d-none" type="file" id="excelFile" accept=".xlsx, .csv" multiple>
+                <p class="text-muted small mb-0">Поддерживаемые форматы: XLSX, CSV</p>
+                <div id="fileListPreview" class="upload-file-list"></div>
+            </div>
+        </form>
+    </div>
+</div>

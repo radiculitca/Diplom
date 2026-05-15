@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', path='favicon.svg') }}">
+    <link href="{{ url_for('static', path='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', path='css/fontawesome.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', path='css/select2.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', path='css/select2-bootstrap-5-theme.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', path='css/app.css') }}" rel="stylesheet">
+    <script src="{{ url_for('static', path='js/sortable.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/chart.umd.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/chartjs-plugin-datalabels.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/jquery-3.7.1.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/select2.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/select2-ru.js') }}"></script>
+</head>
+<body class="ui-system-font wizard-body">
+
+    <nav class="navbar navbar-dark bg-primary shadow-sm navbar-no-shrink">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand" href="/"><i class="fa-solid fa-chart-pie me-2"></i>МГУ им. Огарева | Аналитика опросов</a>
+        </div>
+    </nav>
+
+    <div class="wizard-outer">
+        <div class="wizard-container">
+            <div class="wizard-track" id="wizardTrack">
+                {% include 'partials/step0.html' %}
+                {% include 'partials/step1.html' %}
+                {% include 'partials/step2.html' %}
+                {% include 'partials/step3.html' %}
+                {% include 'partials/step4.html' %}
+                {% include 'partials/step5.html' %}
+            </div>
+        </div>
+        {% include 'partials/wizard_nav.html' %}
+    </div>
+
+    {% include 'partials/modals.html' %}
+
+    <script src="{{ url_for('static', path='js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/transliteration.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/countries.js') }}"></script>
+    <script src="{{ url_for('static', path='js/modules/utils.js') }}"></script>
+    <script src="{{ url_for('static', path='js/modules/wizard.js') }}"></script>
+    <script src="{{ url_for('static', path='js/modules/upload.js') }}"></script>
+    <script src="{{ url_for('static', path='js/modules/sheets.js') }}"></script>
+    <script src="{{ url_for('static', path='js/modules/questions.js') }}"></script>
+    <script src="{{ url_for('static', path='js/modules/fuzzy.js') }}"></script>
+    <script src="{{ url_for('static', path='js/modules/charts.js') }}"></script>
+    <script src="{{ url_for('static', path='js/modules/step4.js') }}"></script>
+    <script src="{{ url_for('static', path='js/modules/step5.js') }}"></script>
+    <script src="{{ url_for('static', path='js/modules/step6.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!-- ШАГ 4: Настройка структуры отчёта -->
+<div class="wizard-step" id="wizardStep3">
+    <div class="wizard-card wizard-card-wide">
+        <div class="wizard-step-header">
+            <span class="wizard-step-num">4</span>
+            <h4 class="wizard-step-title">Настройка структуры отчёта</h4>
+            <span class="step-help-icon ms-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-title="Создайте разделы отчёта и распределите по ним вопросы перетаскиванием или кнопкой «+». Иконка с диаграммой включает визуализацию выбранного вопроса на следующем шаге."><i class="fa-regular fa-circle-question"></i></span>
+        </div>
+        <!-- Скрытый список вопросов из шага 3 (источник данных) -->
+        <div id="sortableQuestionsList" class="d-none">
+            <div id="emptySortablePlaceholder"></div>
+        </div>
+        <!-- Двухпанельный интерфейс -->
+        <div class="step4-body">
+            <!-- Левая панель: разделы -->
+            <div class="step4-left">
+                <button type="button" class="btn btn-outline-primary btn-sm align-self-start" id="addSectionBtn">
+                    <i class="fa-solid fa-plus me-1"></i>Добавить раздел
+                </button>
+                <div class="step4-left-scroll" id="sectionsList">
+                    <p class="text-muted small text-center mt-3 px-2 mb-0"></p>
+                </div>
+            </div>
+            <!-- Правая панель: доступные вопросы -->
+            <div class="step4-right">
+                <div class="fw-semibold small text-muted mb-1 d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-list-check me-1"></i>Список вопросов
+                    <span class="text-muted fw-normal">(выберите и добавьте в раздел)</span>
+                    <div class="form-check mb-0 ms-auto">
+                        <input class="form-check-input" type="checkbox" id="selectAllAvailableQ" title="Выбрать все">
+                        <label class="form-check-label small text-muted" for="selectAllAvailableQ">Все</label>
+                    </div>
+                </div>
+                <div class="step4-right-list" id="availableQuestionsList">
+                    <p class="text-muted small text-center mt-2 mb-0">Выберите вопросы на шаге 3</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

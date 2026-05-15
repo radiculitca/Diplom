@@ -1,0 +1,35 @@
+<!-- ШАГ 6: Генерация ИИ-отчёта -->
+<div class="wizard-step" id="wizardStep5">
+    <div class="wizard-card">
+        <div class="wizard-step-header">
+            <span class="wizard-step-num">6</span>
+            <h4 class="wizard-step-title">Генерация ИИ-отчёта</h4>
+            <span class="step-help-icon ms-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-title="Генерация аналитического текста через OpenRouter API."><i class="fa-regular fa-circle-question"></i></span>
+        </div>
+        <p class="text-muted mb-4">
+            Нажмите кнопку, чтобы сгенерировать аналитический отчёт и скачать его в формате Word.
+        </p>
+
+        <div class="d-flex flex-column gap-3" style="max-width:520px;margin:0 auto;">
+
+            <div class="p-3">
+                <button type="button" class="btn btn-primary w-100" id="downloadApiBtn">
+                    <i class="fa-solid fa-file-arrow-down me-2"></i>Скачать отчёт
+                </button>
+            </div>
+
+            <!-- Прогресс -->
+            <div id="exportProgressContainer" class="d-none">
+                <div class="progress mb-1" style="height:18px;border-radius:8px;">
+                    <div id="exportProgressBar"
+                         class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                         role="progressbar" style="width:0%;font-size:0.72rem;"></div>
+                </div>
+                <small id="exportProgressLabel" class="text-muted d-block text-center text-truncate"></small>
+                <small id="exportTimerLabel" class="text-muted d-block text-center mt-1"
+                       style="font-variant-numeric:tabular-nums;letter-spacing:0.05em;">00:00</small>
+            </div>
+
+        </div>
+    </div>
+</div>

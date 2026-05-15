@@ -1,0 +1,240 @@
+<!-- ==================== МОДАЛКИ ==================== -->
+
+<!-- Добавление раздела -->
+<div class="modal fade" id="addSectionModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title ui-system-font"><i class="fa-solid fa-folder-plus me-2"></i>Новый раздел</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body ui-system-font">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="newSectionName">Название<span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="newSectionName" placeholder="Название раздела">
+                    <div class="invalid-feedback">Введите название раздела</div>
+                </div>
+                <div class="mb-1">
+                    <label class="form-label fw-semibold" for="newSectionDesc">Описание</label>
+                    <textarea class="form-control" id="newSectionDesc" rows="2" placeholder="Краткое описание для точной генерации ИИ-аналитики"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fa-solid fa-xmark me-1"></i>Отмена</button>
+                <button type="button" class="btn btn-primary" id="confirmAddSectionBtn"><i class="fa-solid fa-plus me-1"></i>Добавить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Редактирование раздела -->
+<div class="modal fade" id="editSectionModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title ui-system-font"><i class="fa-solid fa-pen me-2"></i>Редактировать раздел</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body ui-system-font">
+                <input type="hidden" id="editSectionId">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="editSectionName">Название<span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="editSectionName" placeholder="Название раздела">
+                    <div class="invalid-feedback">Введите название раздела</div>
+                </div>
+                <div class="mb-1">
+                    <label class="form-label fw-semibold" for="editSectionDesc">Описание</label>
+                    <textarea class="form-control" id="editSectionDesc" rows="2" placeholder="Краткое описание для точной генерации ИИ-аналитики"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fa-solid fa-xmark me-1"></i>Отмена</button>
+                <button type="button" class="btn btn-primary" id="confirmEditSectionBtn"><i class="fa-solid fa-check me-1"></i>Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Подтверждение удаления раздела -->
+<div class="modal fade" id="confirmDeleteSectionModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title ui-system-font"><i class="fa-solid fa-triangle-exclamation text-danger me-2"></i>Удалить раздел?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body ui-system-font">
+                Раздел <strong id="deleteSectionNameLabel"></strong> и все назначенные ему вопросы будут удалены из структуры отчёта.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fa-solid fa-xmark me-1"></i>Отмена</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteSectionBtn"><i class="fa-solid fa-trash-can me-1"></i>Удалить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Соотнесение вопросов -->
+<div class="modal fade" id="dataMappingModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fa-solid fa-code-merge me-2"></i>Соотнесение вопросов</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="mappingModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fa-solid fa-xmark me-1"></i>Отмена</button>
+                <button type="button" class="btn btn-primary" id="saveMappingBtn"><i class="fa-solid fa-floppy-disk me-1"></i>Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Группировка ответов -->
+<div class="modal fade" id="fuzzyConfirmModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title ui-system-font"><i class="fa-solid fa-object-group me-2"></i>Группировка ответов</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body ui-system-font">
+                <ul class="nav nav-tabs mb-3" id="fuzzyModalTabs">
+                    <li class="nav-item">
+                        <button class="nav-link active" data-fuzzy-tab="fuzzy"><i class="fa-solid fa-spell-check me-1"></i>Похожие ответы</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-fuzzy-tab="ranges"><i class="fa-solid fa-sliders me-1"></i>Диапазоны</button>
+                    </li>
+                </ul>
+                <div id="fuzzyTabPane">
+                    <p>«Сгруппировать» — объединяет ответы, отличающиеся не более чем на 2 символа; наиболее частый вариант становится основным.<br>
+                    «ИИ» — нормализует синонимы, разные формы слов и ответы на других языках до русских канонических форм.</p>
+                    <div class="d-flex gap-2 flex-wrap align-items-center">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="fuzzyPreviewBtn"><i class="fa-solid fa-layer-group me-1"></i>Сгруппировать</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" data-ai-backend="openrouter"><i class="fa-solid fa-robot me-1"></i>Сгруппировать с ИИ</button>
+                    </div>
+                </div>
+                <div id="rangesTabPane" class="d-none">
+                    <p>Числовые ответы (исключённые не учитываются) разбиваются на равные диапазоны. Нечисловые ответы попадают в группу <em>«Другое»</em>.</p>
+                    <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                        <label class="mb-0">Разбить на:</label>
+                        <input type="number" id="rangeCountInput" class="form-control form-control-sm range-count-w" min="2" max="20" value="4">
+                        <span class="text-muted">диапазонов</span>
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="rangesPreviewBtn"><i class="fa-solid fa-layer-group me-1"></i>Сгруппировать</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="manualRangesBtn" title="Задать границы диапазонов вручную"><i class="fa-solid fa-pen me-1"></i>Вручную</button>
+                    </div>
+                </div>
+                <div id="fuzzyPreviewArea" class="d-none">
+                    <hr class="my-2">
+                    <div class="small fw-bold text-muted mb-2"><i class="fa-solid fa-eye me-1"></i>Предварительный результат:</div>
+                    <div id="fuzzyPreviewContent" class="scrollable-box fuzzy-preview-scroll"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fa-solid fa-xmark me-1"></i>Отмена</button>
+                <button type="button" class="btn btn-primary" id="fuzzyConfirmBtn" disabled><i class="fa-solid fa-check me-1"></i>Применить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Прогресс ИИ-группировки -->
+<div class="modal fade" id="aiGroupProgressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-body text-center py-4 ui-system-font">
+                <div class="mb-3"><i class="fa-solid fa-robot fa-2x text-primary"></i></div>
+                <div class="fw-semibold mb-3">ИИ анализирует ответы...</div>
+                <div class="progress progress-xs">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated w-100"></div>
+                </div>
+                <div class="text-muted small mt-2">Обычно занимает не более пары минут...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ручная настройка диапазонов -->
+<div class="modal fade" id="manualRangesModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title ui-system-font"><i class="fa-solid fa-pen me-2"></i>Ручная настройка диапазонов</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body ui-system-font manual-ranges-scroll" id="manualRangesBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fa-solid fa-xmark me-1"></i>Отмена</button>
+                <button type="button" class="btn btn-primary" id="applyManualRangesBtn"><i class="fa-solid fa-check me-1"></i>Применить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Редактирование данных диаграммы -->
+<div class="modal fade" id="chartEditModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title ui-system-font" id="chartEditModalLabel"><i class="fa-solid fa-pen-to-square me-2"></i>Редактирование данных</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body ui-system-font" id="chartEditModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal"><i class="fa-solid fa-check me-1"></i>Готово</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Настройка таблицы (скрытие столбцов) -->
+<div class="modal fade" id="hideColModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title ui-system-font"><i class="fa-solid fa-table-columns me-2"></i>Настройка таблицы</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body ui-system-font">
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="hideColRadio" id="hideColNone" value="none">
+                    <label class="form-check-label" for="hideColNone">Не скрывать</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="hideColRadio" id="hideColCount" value="count">
+                    <label class="form-check-label" for="hideColCount">Скрыть "Кол-во ответивших"</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="hideColRadio" id="hideColPct" value="percent">
+                    <label class="form-check-label" for="hideColPct">Скрыть "% от ответивших"</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fa-solid fa-xmark me-1"></i>Отмена</button>
+                <button type="button" class="btn btn-primary" id="saveHideColBtn"><i class="fa-solid fa-check me-1"></i>Применить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Слияние ответов -->
+<div class="modal fade" id="mergeAnswerModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title ui-system-font"><i class="fa-solid fa-code-merge me-2"></i>Слить ответ в...</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body ui-system-font">
+                <p class="text-muted small mb-2">Количество ответов <strong>«<span id="mergeSourceLabel"></span>»</strong> будет прибавлено к выбранному, а строка исчезнет.</p>
+                <select id="mergeTargetSelect" class="w-100"></select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fa-solid fa-xmark me-1"></i>Отмена</button>
+                <button type="button" class="btn btn-primary" id="applyMergeBtn"><i class="fa-solid fa-code-merge me-1"></i>Применить</button>
+            </div>
+        </div>
+    </div>
+</div>

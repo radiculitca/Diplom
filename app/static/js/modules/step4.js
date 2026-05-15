@@ -1,0 +1,315 @@
+// ===================== ШАГ 4: СТРУКТУРА ОТЧЁТА =====================
+window.reportSections = window.reportSections || [];
+let _sectionIdCounter = 0;
+
+function _getAllStep3QNames() {
+    return Array.from(document.querySelectorAll('#sortableQuestionsList .question-item')).map(el => el.dataset.col);
+}
+
+function _getAssignedQNames() {
+    const s = new Set();
+    (window.reportSections || []).forEach(sec => sec.questions.forEach(q => s.add(q.qName)));
+    return s;
+}
+
+function _updateToStep5Btn() {
+    const btn = document.getElementById('toStep5Btn');
+    if (!btn) return;
+    const empty = !window.reportSections || !window.reportSections.length;
+    btn.disabled = empty;
+    btn.title = empty ? 'Создайте хотя бы один раздел на шаге 4' : '';
+}
+
+function renderStep4() {
+    _renderSectionsList();
+    _renderAvailableQuestions();
+}
+
+function _renderSectionsList() {
+    const container = document.getElementById('sectionsList');
+    _updateToStep5Btn();
+    if (!window.reportSections || !window.reportSections.length) {
+        container.innerHTML = '<p class="text-muted small text-center mt-3 px-2 mb-0"></p>';
+        return;
+    }
+    container.innerHTML = '';
+    window.reportSections.forEach(sec => {
+        container.insertAdjacentHTML('beforeend', _buildSectionCardHtml(sec));
+    });
+    window.reportSections.forEach(sec => {
+        const listEl = container.querySelector(`.section-questions-list[data-section-id="${sec.id}"]`);
+        if (!listEl) return;
+        new Sortable(listEl, {
+            handle: '.section-q-drag',
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            filter: '.section-empty-hint',
+            onEnd: evt => {
+                const s = window.reportSections.find(x => x.id === sec.id);
+                if (!s) return;
+                const moved = s.questions.splice(evt.oldIndex, 1)[0];
+                s.questions.splice(evt.newIndex, 0, moved);
+            }
+        });
+    });
+}
+
+function _buildSectionCardHtml(sec) {
+    const qHtml = sec.questions.length === 0
+        ? `<div class="section-empty-hint">Перетащите вопросы сюда или нажмите «+»</div>`
+        : sec.questions.map(q => _buildSectionQuestionHtml(sec.id, q)).join('');
+    const collapsed = window._collapsedSections && window._collapsedSections.has(sec.id);
+    return `
+    <div class="card mb-2 section-card" data-section-id="${_escAttr(sec.id)}">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <button type="button" class="section-collapse-btn" data-section-id="${_escAttr(sec.id)}" title="${collapsed ? 'Развернуть' : 'Свернуть'}">
+                    <i class="fa-solid ${collapsed ? 'fa-chevron-up' : 'fa-chevron-down'}"></i>
+                </button>
+                <span class="fw-semibold flex-grow-1 text-truncate" title="${_escAttr(sec.name)}">${_escHtml(sec.name)}</span>
+                <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 add-qs-to-section-btn" data-section-id="${_escAttr(sec.id)}" title="Добавить выбранные вопросы">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 edit-section-btn" data-section-id="${_escAttr(sec.id)}" title="Редактировать раздел">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 delete-section-btn" data-section-id="${_escAttr(sec.id)}" title="Удалить раздел">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </div>
+            <div class="section-questions-wrapper${collapsed ? ' collapsed' : ''}" data-section-id="${_escAttr(sec.id)}">
+                <div class="section-questions-list border rounded p-1" data-section-id="${_escAttr(sec.id)}">
+                    ${qHtml}
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function _isMissingMapping(qName) {
+    if (!window.processedFiles || window.processedFiles.length <= 1) return false;
+    const mapping = window.questionMapping[qName] || {};
+    return Object.keys(mapping).length < window.processedFiles.length;
+}
+
+function _buildSectionQuestionHtml(sectionId, q) {
+    const multiFile = window.processedFiles && window.processedFiles.length > 1;
+    const missing = multiFile && _isMissingMapping(q.qName);
+    const mappingBtn = multiFile
+        ? `<button type="button" class="section-q-action section-q-mapping-btn${missing ? ' text-danger' : ''}" data-qname="${_escAttr(q.qName)}" title="${missing ? 'Вопрос не соотнесён во всех файлах — нажмите, чтобы исправить' : 'Соотнести вручную'}"><i class="fa-solid fa-link"></i></button>`
+        : '';
+    const itemClass = missing ? ' q-item-missing' : (q.visualize ? ' q-item-viz' : '');
+    return `
+    <div class="section-question-item${itemClass}" data-qname="${_escAttr(q.qName)}" data-section-id="${_escAttr(sectionId)}">
+        <span class="section-q-drag" title="Переместить"><i class="fa-solid fa-grip-lines"></i></span>
+        <span class="flex-grow-1 text-truncate small fw-medium" title="${_escAttr(q.qName)}">${_escHtml(q.qName)}</span>
+        <button type="button" class="section-q-viz-btn ${q.visualize ? 'active' : ''}" data-qname="${_escAttr(q.qName)}" data-section-id="${_escAttr(sectionId)}" title="${q.visualize ? 'Визуализируется (нажмите, чтобы отключить)' : 'Добавить визуализацию'}"><i class="fa-solid fa-chart-line"></i></button>
+        ${mappingBtn}
+        <button type="button" class="section-q-remove-btn" data-qname="${_escAttr(q.qName)}" data-section-id="${_escAttr(sectionId)}" title="Убрать из раздела">−</button>
+    </div>`;
+}
+
+function _renderAvailableQuestions() {
+    const container = document.getElementById('availableQuestionsList');
+    const assigned = _getAssignedQNames();
+    const available = _getAllStep3QNames().filter(q => !assigned.has(q));
+
+    if (!available.length) {
+        container.innerHTML = '<p class="text-muted small text-center mt-2 mb-0">Все вопросы распределены по разделам</p>';
+        return;
+    }
+
+    container.innerHTML = available.map(qName => `
+        <div class="available-q-item" data-qname="${_escAttr(qName)}">
+            <input type="checkbox" class="form-check-input flex-shrink-0 avail-q-cb cursor-pointer" data-qname="${_escAttr(qName)}">
+            <span class="text-truncate small" title="${_escAttr(qName)}">${_escHtml(qName)}</span>
+        </div>`).join('');
+
+    const selectAll = document.getElementById('selectAllAvailableQ');
+    if (selectAll) selectAll.checked = false;
+
+    container.querySelectorAll('.available-q-item').forEach(el => {
+        el.setAttribute('draggable', 'true');
+        el.addEventListener('click', e => {
+            if (e.target.classList.contains('avail-q-cb')) return;
+            const cb = el.querySelector('.avail-q-cb');
+            if (cb) cb.checked = !cb.checked;
+            _syncSelectAllAvailableQ();
+        });
+        el.addEventListener('dragstart', e => {
+            el.classList.add('dragging');
+            const cb = el.querySelector('.avail-q-cb');
+            const checkedNames = Array.from(document.querySelectorAll('#availableQuestionsList .avail-q-cb:checked')).map(c => c.dataset.qname);
+            window._step4DragNames = (cb && cb.checked && checkedNames.length > 0) ? checkedNames : [el.dataset.qname];
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', window._step4DragNames.join('\n'));
+        });
+        el.addEventListener('dragend', () => el.classList.remove('dragging'));
+        el.querySelector('.avail-q-cb').addEventListener('change', _syncSelectAllAvailableQ);
+    });
+}
+
+function _syncSelectAllAvailableQ() {
+    const all = Array.from(document.querySelectorAll('#availableQuestionsList .avail-q-cb'));
+    const selectAll = document.getElementById('selectAllAvailableQ');
+    if (!selectAll || !all.length) return;
+    const checkedCount = all.filter(cb => cb.checked).length;
+    selectAll.indeterminate = checkedCount > 0 && checkedCount < all.length;
+    selectAll.checked = checkedCount === all.length;
+}
+
+document.getElementById('selectAllAvailableQ').addEventListener('change', function () {
+    document.querySelectorAll('#availableQuestionsList .avail-q-cb').forEach(cb => { cb.checked = this.checked; });
+});
+
+function _addQNamesToSection(sectionId, qNames) {
+    const sec = window.reportSections.find(s => s.id === sectionId);
+    if (!sec) return;
+    const assigned = _getAssignedQNames();
+    let added = false;
+    qNames.forEach(qName => {
+        if (qName && !assigned.has(qName) && !sec.questions.find(q => q.qName === qName)) {
+            sec.questions.push({ qName, visualize: false });
+            assigned.add(qName);
+            added = true;
+        }
+    });
+    if (added) renderStep4();
+}
+
+// Drag-drop на зону раздела
+document.getElementById('sectionsList').addEventListener('dragover', e => {
+    if (!window._step4DragNames || !window._step4DragNames.length) return;
+    const zone = e.target.closest('.section-questions-list');
+    if (zone) { e.preventDefault(); zone.classList.add('drag-over'); }
+});
+document.getElementById('sectionsList').addEventListener('dragleave', e => {
+    if (!window._step4DragNames || !window._step4DragNames.length) return;
+    const zone = e.target.closest('.section-questions-list');
+    if (zone && !zone.contains(e.relatedTarget)) zone.classList.remove('drag-over');
+});
+document.getElementById('sectionsList').addEventListener('drop', e => {
+    if (!window._step4DragNames || !window._step4DragNames.length) return;
+    const zone = e.target.closest('.section-questions-list');
+    if (!zone) return;
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const names = window._step4DragNames;
+    window._step4DragNames = [];
+    _addQNamesToSection(zone.dataset.sectionId, names);
+});
+
+// Клики в панели разделов
+document.getElementById('sectionsList').addEventListener('click', e => {
+    const colBtn = e.target.closest('.section-collapse-btn');
+    if (colBtn) {
+        const secId = colBtn.dataset.sectionId;
+        const wrapperEl = document.querySelector(`.section-questions-wrapper[data-section-id="${secId}"]`);
+        const isNowCollapsed = wrapperEl.classList.toggle('collapsed');
+        colBtn.querySelector('i').className = `fa-solid ${isNowCollapsed ? 'fa-chevron-up' : 'fa-chevron-down'}`;
+        colBtn.title = isNowCollapsed ? 'Развернуть' : 'Свернуть';
+        if (!window._collapsedSections) window._collapsedSections = new Set();
+        if (isNowCollapsed) window._collapsedSections.add(secId);
+        else window._collapsedSections.delete(secId);
+        return;
+    }
+    const addBtn = e.target.closest('.add-qs-to-section-btn');
+    if (addBtn) {
+        const checked = Array.from(document.querySelectorAll('#availableQuestionsList .avail-q-cb:checked')).map(cb => cb.dataset.qname);
+        if (!checked.length) { showToast('Выберите вопросы в правом списке', 'warning'); return; }
+        _addQNamesToSection(addBtn.dataset.sectionId, checked);
+        return;
+    }
+    const editBtn = e.target.closest('.edit-section-btn');
+    if (editBtn) {
+        const sec = window.reportSections.find(s => s.id === editBtn.dataset.sectionId);
+        if (!sec) return;
+        document.getElementById('editSectionId').value = sec.id;
+        document.getElementById('editSectionName').value = sec.name;
+        document.getElementById('editSectionName').classList.remove('is-invalid');
+        document.getElementById('editSectionDesc').value = sec.description || '';
+        new bootstrap.Modal(document.getElementById('editSectionModal')).show();
+        return;
+    }
+    const delBtn = e.target.closest('.delete-section-btn');
+    if (delBtn) {
+        const sec = window.reportSections.find(s => s.id === delBtn.dataset.sectionId);
+        if (!sec) return;
+        document.getElementById('deleteSectionNameLabel').textContent = `«${sec.name}»`;
+        document.getElementById('confirmDeleteSectionBtn').dataset.sectionId = sec.id;
+        new bootstrap.Modal(document.getElementById('confirmDeleteSectionModal')).show();
+        return;
+    }
+    const remBtn = e.target.closest('.section-q-remove-btn');
+    if (remBtn) {
+        const sec = window.reportSections.find(s => s.id === remBtn.dataset.sectionId);
+        if (sec) sec.questions = sec.questions.filter(q => q.qName !== remBtn.dataset.qname);
+        renderStep4();
+        return;
+    }
+    const mapBtn = e.target.closest('.section-q-mapping-btn');
+    if (mapBtn) { openMappingModal(mapBtn.dataset.qname); return; }
+
+    const vizBtn = e.target.closest('.section-q-viz-btn');
+    if (vizBtn) {
+        const sec = window.reportSections.find(s => s.id === vizBtn.dataset.sectionId);
+        if (!sec) return;
+        const q = sec.questions.find(q => q.qName === vizBtn.dataset.qname);
+        if (!q) return;
+        q.visualize = !q.visualize;
+        vizBtn.classList.toggle('active', q.visualize);
+        vizBtn.title = q.visualize ? 'Визуализируется (нажмите, чтобы отключить)' : 'Добавить визуализацию';
+        const row = vizBtn.closest('.section-question-item');
+        if (row && !row.classList.contains('q-item-missing')) {
+            row.classList.toggle('q-item-viz', q.visualize);
+        }
+        return;
+    }
+});
+
+// Модалка добавления раздела
+document.getElementById('addSectionBtn').addEventListener('click', () => {
+    document.getElementById('newSectionName').value = '';
+    document.getElementById('newSectionName').classList.remove('is-invalid');
+    document.getElementById('newSectionDesc').value = '';
+    new bootstrap.Modal(document.getElementById('addSectionModal')).show();
+});
+
+document.getElementById('newSectionName').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('confirmAddSectionBtn').click(); }
+});
+
+document.getElementById('confirmAddSectionBtn').addEventListener('click', () => {
+    const name = document.getElementById('newSectionName').value.trim();
+    if (!name) { document.getElementById('newSectionName').classList.add('is-invalid'); return; }
+    document.getElementById('newSectionName').classList.remove('is-invalid');
+    window.reportSections.push({
+        id: 'sec_' + (++_sectionIdCounter),
+        name,
+        description: document.getElementById('newSectionDesc').value.trim(),
+        questions: []
+    });
+    bootstrap.Modal.getInstance(document.getElementById('addSectionModal')).hide();
+    _renderSectionsList();
+});
+
+document.getElementById('confirmEditSectionBtn').addEventListener('click', () => {
+    const name = document.getElementById('editSectionName').value.trim();
+    if (!name) { document.getElementById('editSectionName').classList.add('is-invalid'); return; }
+    document.getElementById('editSectionName').classList.remove('is-invalid');
+    const secId = document.getElementById('editSectionId').value;
+    const sec = window.reportSections.find(s => s.id === secId);
+    if (sec) {
+        sec.name = name;
+        sec.description = document.getElementById('editSectionDesc').value.trim();
+    }
+    bootstrap.Modal.getInstance(document.getElementById('editSectionModal')).hide();
+    _renderSectionsList();
+});
+
+document.getElementById('confirmDeleteSectionBtn').addEventListener('click', function () {
+    const secId = this.dataset.sectionId;
+    window.reportSections = window.reportSections.filter(s => s.id !== secId);
+    bootstrap.Modal.getInstance(document.getElementById('confirmDeleteSectionModal')).hide();
+    renderStep4();
+});

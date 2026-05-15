@@ -1,0 +1,19 @@
+<!-- ШАГ 2: Листы -->
+<div class="wizard-step" id="wizardStep1">
+    <div class="wizard-card">
+        <div class="wizard-step-header">
+            <span class="wizard-step-num">2</span>
+            <h4 class="wizard-step-title">Выберите листы для анализа</h4>
+            <span class="step-help-icon ms-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-title="Для каждого загруженного файла выберите лист с данными опроса (в первой строке файла должны быть названия вопросов, в остальных - ответы)."><i class="fa-regular fa-circle-question"></i></span>
+        </div>
+        <form id="sheetForm">
+            <div class="form-check pb-2">
+                <input class="form-check-input" type="checkbox" id="selectAllSheets">
+                <label class="form-check-label fw-bold" for="selectAllSheets">
+                    <i class="fa-solid fa-check-double me-1"></i>Все листы
+                </label>
+            </div>
+            <div class="scrollable-box scrollable-box-lg mb-1" id="sheetCheckboxesContainer"></div>
+        </form>
+    </div>
+</div>

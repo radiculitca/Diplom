@@ -123,6 +123,7 @@ function _renderAvailableQuestions() {
         <div class="available-q-item" data-qname="${_escAttr(qName)}">
             <input type="checkbox" class="form-check-input flex-shrink-0 avail-q-cb cursor-pointer" data-qname="${_escAttr(qName)}">
             <span class="text-truncate small" title="${_escAttr(qName)}">${_escHtml(qName)}</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary ms-1 merge-question-btn" data-qname="${_escAttr(qName)}" title="Склеить с другим вопросом"><i class="fa-solid fa-link"></i></button>
         </div>`).join('');
 
     const selectAll = document.getElementById('selectAllAvailableQ');
@@ -313,3 +314,110 @@ document.getElementById('confirmDeleteSectionBtn').addEventListener('click', fun
     bootstrap.Modal.getInstance(document.getElementById('confirmDeleteSectionModal')).hide();
     renderStep4();
 });
+
+// ===================== СКЛЕЙКА ВОПРОСОВ =====================
+let _mergeQuestionsSourceName = null;
+
+// Делегирование на availableQuestionsList
+document.getElementById('availableQuestionsList').addEventListener('click', (e) => {
+    const btn = e.target.closest('.merge-question-btn');
+    if (!btn) return;
+    _mergeQuestionsSourceName = btn.dataset.qname;
+    openMergeQuestionsModal(_mergeQuestionsSourceName);
+});
+
+function openMergeQuestionsModal(sourceName) {
+    document.getElementById('mergeQuestionsSourceLabel').textContent = `«${sourceName}»`;
+    document.getElementById('mergeQuestionsSearch').value = '';
+
+    // Все вопросы в availableQuestionsList кроме самого источника
+    const allQNames = Array.from(
+        document.querySelectorAll('#availableQuestionsList .available-q-item')
+    ).map(el => el.dataset.qname).filter(n => n !== sourceName);
+
+    _renderMergeQuestionsList(allQNames, '');
+
+    document.getElementById('mergeQuestionsSearch').addEventListener('input', function () {
+        _renderMergeQuestionsList(allQNames, this.value.trim().toLowerCase());
+    });
+
+    new bootstrap.Modal(document.getElementById('mergeQuestionsModal')).show();
+}
+
+function _renderMergeQuestionsList(names, filter) {
+    const container = document.getElementById('mergeQuestionsList');
+    const filtered = filter ? names.filter(n => n.toLowerCase().includes(filter)) : names;
+
+    if (!filtered.length) {
+        container.innerHTML = '<p class="text-muted small text-center py-3 mb-0">Нет доступных вопросов</p>';
+        return;
+    }
+
+    container.innerHTML = filtered.map(name => {
+        // Показываем какие ответы уже склеены с этим вопросом (если есть)
+        const merged = window.questionMerges && window.questionMerges[name];
+        const mergedHint = merged && merged.length
+            ? `<small class="text-muted ms-2">(уже склеен с: ${merged.slice(0,2).map(m => `«${_escHtml(m)}»`).join(', ')}${merged.length > 2 ? ` +${merged.length - 2}` : ''})</small>`
+            : '';
+        return `
+        <div class="form-check py-1 border-bottom d-flex align-items-start gap-2">
+            <input class="form-check-input flex-shrink-0 mt-1 merge-q-checkbox"
+                   type="checkbox" id="mqcb_${_escAttr(name)}" value="${_escAttr(name)}">
+            <label class="form-check-label small fw-medium cursor-pointer flex-grow-1"
+                   for="mqcb_${_escAttr(name)}">${_escHtml(name)}${mergedHint}</label>
+        </div>`;
+    }).join('');
+}
+
+document.getElementById('applyMergeQuestionsBtn').addEventListener('click', () => {
+    const checked = Array.from(
+        document.querySelectorAll('#mergeQuestionsList .merge-q-checkbox:checked')
+    ).map(cb => cb.value);
+
+    if (!checked.length) {
+        showToast('Выберите хотя бы один вопрос для склейки', 'warning');
+        return;
+    }
+
+    // Сохраняем маппинг склейки: sourceName -> [donorName, ...]
+    if (!window.questionMerges) window.questionMerges = {};
+    if (!window.questionMerges[_mergeQuestionsSourceName]) {
+        window.questionMerges[_mergeQuestionsSourceName] = [];
+    }
+    checked.forEach(name => {
+        if (!window.questionMerges[_mergeQuestionsSourceName].includes(name)) {
+            window.questionMerges[_mergeQuestionsSourceName].push(name);
+        }
+    });
+
+    // Убираем доноров из availableQuestionsList
+    checked.forEach(name => {
+        const item = document.querySelector(`#availableQuestionsList .available-q-item[data-qname="${CSS.escape(name)}"]`);
+        if (item) item.remove();
+    });
+
+    // Обновляем иконку на кнопке источника — показываем что есть склейка
+    _updateMergeIndicator(_mergeQuestionsSourceName);
+
+    bootstrap.Modal.getInstance(document.getElementById('mergeQuestionsModal')).hide();
+    showToast(`Склеено вопросов: ${checked.length}`, 'success');
+});
+
+function _updateMergeIndicator(sourceName) {
+    const item = document.querySelector(
+        `#availableQuestionsList .available-q-item[data-qname="${CSS.escape(sourceName)}"]`
+    );
+    if (!item) return;
+    const btn = item.querySelector('.merge-question-btn');
+    if (!btn) return;
+    const merges = window.questionMerges && window.questionMerges[sourceName];
+    if (merges && merges.length) {
+        btn.classList.remove('btn-outline-secondary');
+        btn.classList.add('btn-warning');
+        btn.title = `Склеен с: ${merges.map(m => `«${m}»`).join(', ')} (нажмите, чтобы изменить)`;
+    } else {
+        btn.classList.add('btn-outline-secondary');
+        btn.classList.remove('btn-warning');
+        btn.title = 'Склеить с другим вопросом';
+    }
+}

@@ -126,12 +126,25 @@ def generate_report_data(upload_dir, request_data):
         file_counts = {}
 
         for f_name, q_name in cfg.file_mapping.items():
-            if f_name not in dfs or q_name not in groups_cache[f_name]:
+            if f_name not in dfs:
                 continue
-            counts = _get_answer_counts(dfs[f_name], q_name, groups_cache[f_name])
-            if counts:
-                file_counts[f_name] = counts
-                all_answers.update(counts.keys())
+
+            # Основной вопрос
+            combined_counts: dict = {}
+            if q_name in groups_cache[f_name]:
+                combined_counts = _get_answer_counts(dfs[f_name], q_name, groups_cache[f_name])
+
+            # Доноры — ищем в том же файле по имени колонки
+            for donor_name in getattr(cfg, 'merged_columns', []):
+                if donor_name not in groups_cache[f_name]:
+                    continue
+                donor_counts = _get_answer_counts(dfs[f_name], donor_name, groups_cache[f_name])
+                for ans, cnt in donor_counts.items():
+                    combined_counts[ans] = combined_counts.get(ans, 0) + cnt
+
+            if combined_counts:
+                file_counts[f_name] = combined_counts
+                all_answers.update(combined_counts.keys())
 
         q_file_keys = [k for k in file_labels if k in cfg.file_mapping]
         q_file_labels = {k: file_labels[k] for k in q_file_keys}

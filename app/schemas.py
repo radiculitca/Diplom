@@ -12,6 +12,7 @@ class ColumnConfig(BaseModel):
     column: str
     viz_type: List[str]
     file_mapping: Dict[str, str]
+    merged_columns: List[str] = []
 
 class AnalyzeRequest(BaseModel):
     file_labels: Dict[str, str]

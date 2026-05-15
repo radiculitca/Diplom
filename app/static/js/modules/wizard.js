@@ -68,6 +68,7 @@ function _resetFromStep(newStep) {
     if (newStep < 2) {
         window.questionMapping = {};
         window.questionSourceFile = {};
+        window.questionMerges = {};
         document.getElementById('sortableQuestionsList').innerHTML = '<div id="emptySortablePlaceholder"></div>';
         document.getElementById('allQuestionsList').innerHTML = '';
         document.getElementById('selectAllQuestions').checked = false;

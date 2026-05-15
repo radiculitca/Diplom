@@ -238,3 +238,34 @@
         </div>
     </div>
 </div>
+
+<!-- Склейка вопросов -->
+<div class="modal fade" id="mergeQuestionsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title ui-system-font">
+                    <i class="fa-solid fa-link me-2"></i>Склеить вопросы
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body ui-system-font">
+                <p class="text-muted small mb-3">
+                    Ответы из отмеченных вопросов будут добавлены к ответам основного вопроса
+                    <strong id="mergeQuestionsSourceLabel"></strong>.<br>
+                    Вопросы-доноры исчезнут из списка — их данные войдут в основной.
+                </p>
+                <input type="text" class="form-control form-control-sm mb-2" id="mergeQuestionsSearch" placeholder="Поиск вопроса...">
+                <div class="scrollable-box" style="max-height:340px" id="mergeQuestionsList"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fa-solid fa-xmark me-1"></i>Отмена
+                </button>
+                <button type="button" class="btn btn-primary" id="applyMergeQuestionsBtn">
+                    <i class="fa-solid fa-link me-1"></i>Склеить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

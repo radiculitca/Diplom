@@ -36,7 +36,13 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
     const configs = [];
     (window.reportSections || []).forEach(sec => {
         sec.questions.forEach(q => {
-            configs.push({ column: q.qName, viz_type: ALL_VIZ, file_mapping: window.questionMapping[q.qName] });
+            const mergedColumns = (window.questionMerges && window.questionMerges[q.qName]) || [];
+            configs.push({
+                column: q.qName,
+                viz_type: ALL_VIZ,
+                file_mapping: window.questionMapping[q.qName],
+                merged_columns: mergedColumns   // список доноров
+            });
         });
     });
 

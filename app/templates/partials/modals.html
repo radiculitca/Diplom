@@ -14,6 +14,11 @@
                     <input type="text" class="form-control" id="newSectionName" placeholder="Название раздела">
                     <div class="invalid-feedback">Введите название раздела</div>
                 </div>
+                <div class="mb-3 d-flex align-items-center gap-2">
+                    <label class="form-label fw-semibold mb-0" for="newSectionColor">Цвет раздела</label>
+                    <input type="color" class="form-control form-control-color" id="newSectionColor" value="#0d6efd" style="width:40px;height:32px;padding:2px 3px;cursor:pointer;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="randomNewSectionColor" title="Случайный цвет"><i class="fa-solid fa-dice-five"></i></button>
+                </div>
                 <div class="mb-1">
                     <label class="form-label fw-semibold" for="newSectionDesc">Описание</label>
                     <textarea class="form-control" id="newSectionDesc" rows="2" placeholder="Краткое описание для точной генерации ИИ-аналитики"></textarea>
@@ -41,6 +46,11 @@
                     <label class="form-label fw-semibold" for="editSectionName">Название<span class="text-danger">*</span></label>
                     <input type="text" class="form-control" id="editSectionName" placeholder="Название раздела">
                     <div class="invalid-feedback">Введите название раздела</div>
+                </div>
+                <div class="mb-3 d-flex align-items-center gap-2">
+                    <label class="form-label fw-semibold mb-0" for="editSectionColor">Цвет раздела</label>
+                    <input type="color" class="form-control form-control-color" id="editSectionColor" value="#0d6efd" style="width:40px;height:32px;padding:2px 3px;cursor:pointer;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="randomEditSectionColor" title="Случайный цвет"><i class="fa-solid fa-dice-five"></i></button>
                 </div>
                 <div class="mb-1">
                     <label class="form-label fw-semibold" for="editSectionDesc">Описание</label>
@@ -255,6 +265,8 @@
                     <strong id="mergeQuestionsSourceLabel"></strong>.<br>
                     Вопросы-доноры исчезнут из списка — их данные войдут в основной.
                 </p>
+                <!-- modals.html — внутри #mergeQuestionsModal .modal-body, ДОБАВИТЬ перед строкой поиска: -->
+                <div id="mergeQuestionsAttached" class="mb-2"></div>
                 <input type="text" class="form-control form-control-sm mb-2" id="mergeQuestionsSearch" placeholder="Поиск вопроса...">
                 <div class="scrollable-box" style="max-height:340px" id="mergeQuestionsList"></div>
             </div>

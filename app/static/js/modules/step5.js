@@ -186,11 +186,12 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
 
                 if (vizQuestions.length) {
                     const rscCollapsed = window._collapsedReportSections && window._collapsedReportSections.has(sec.id);
+                    const secColor = sec.color || '#a0bce5';
                     reportContent.insertAdjacentHTML('beforeend', `
-                        <div class="report-section-card mb-4">
+                        <div class="report-section-card mb-4" style="border-left: 3px solid ${secColor}; padding-left: 8px;">
                             <div class="report-section-header">
-                                <i class="fa-solid fa-layer-group me-2"></i>
-                                <span class="flex-grow-1">${_escHtml(sec.name)}</span>
+                                <i class="fa-solid fa-layer-group me-2"style="color:${secColor};"></i>
+                                <span class="flex-grow-1" style="color:${secColor};">${_escHtml(sec.name)}</span>
                                 <button type="button" class="report-section-collapse-btn" data-section-id="${_escAttr(sec.id)}" title="${rscCollapsed ? 'Развернуть' : 'Свернуть'}">
                                     <i class="fa-solid ${rscCollapsed ? 'fa-chevron-up' : 'fa-chevron-down'}"></i>
                                 </button>

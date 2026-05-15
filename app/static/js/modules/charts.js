@@ -526,6 +526,12 @@ function renderTable(tableId) {
     const tableEl = document.getElementById(tableId);
     if (!tableEl) return;
 
+    dataObj.data.sort((a, b) => {
+        if (a.included && !b.included) return -1;
+        if (!a.included && b.included) return 1;
+        return b._total - a._total;
+    });
+
     const isVert = dataObj.options.tableVertical;
     const activeRows = dataObj.data.filter(r => r.included);
 
@@ -802,18 +808,33 @@ document.addEventListener('input', (e) => {
 
 document.addEventListener('focusout', (e) => {
     if (e.target.classList.contains('answer-count') || e.target.classList.contains('answer-text') || e.target.hasAttribute('data-header')) {
-        renderTable(e.target.dataset.id);
-        drawChart(e.target.dataset.id);
-        drawStackedChart(e.target.dataset.id);
-        drawPieChart(e.target.dataset.id);
-    }
-    if (e.target.classList.contains('modal-answer-count') || e.target.classList.contains('modal-answer-text')) {
         const id = e.target.dataset.id;
-        renderChartEditModal(id);
+        if (e.target.classList.contains('answer-count')) {
+            // Пересчитать _total для строки
+            const dataObj = window.appData[id];
+            if (dataObj) {
+                dataObj.data.forEach(row => {
+                    row._total = Object.values(row.counts).reduce((a, b) => a + b, 0);
+                });
+            }
+        }
         renderTable(id);
         drawChart(id);
         drawStackedChart(id);
         drawPieChart(id);
+    }
+    if (e.target.classList.contains('modal-answer-count') || e.target.classList.contains('modal-answer-text')) {
+        const id = e.target.dataset.id;
+            if (e.target.classList.contains('modal-answer-count')) {
+                const dataObj = window.appData[id];
+                if (dataObj) {
+                    dataObj.data.forEach(row => {
+                        row._total = Object.values(row.counts).reduce((a, b) => a + b, 0);
+                    });
+                }
+            }
+            renderChartEditModal(id);
+            renderTable(id);
     }
 });
 

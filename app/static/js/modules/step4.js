@@ -59,14 +59,15 @@ function _buildSectionCardHtml(sec) {
         ? `<div class="section-empty-hint">Перетащите вопросы сюда или нажмите «+»</div>`
         : sec.questions.map(q => _buildSectionQuestionHtml(sec.id, q)).join('');
     const collapsed = window._collapsedSections && window._collapsedSections.has(sec.id);
-    return `
-    <div class="card mb-2 section-card" data-section-id="${_escAttr(sec.id)}">
-        <div class="card-body py-2 px-3">
-            <div class="d-flex align-items-center gap-2 mb-1">
-                <button type="button" class="section-collapse-btn" data-section-id="${_escAttr(sec.id)}" title="${collapsed ? 'Развернуть' : 'Свернуть'}">
-                    <i class="fa-solid ${collapsed ? 'fa-chevron-up' : 'fa-chevron-down'}"></i>
-                </button>
-                <span class="fw-semibold flex-grow-1 text-truncate" title="${_escAttr(sec.name)}">${_escHtml(sec.name)}</span>
+    const sectionColor = sec.color || '#a0bce5';
+        return `
+        <div class="card mb-2 section-card" data-section-id="${_escAttr(sec.id)}" style="border-left: 3px solid ${sectionColor};">
+            <div class="card-body py-2 px-3">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <button type="button" class="section-collapse-btn" data-section-id="${_escAttr(sec.id)}" title="${collapsed ? 'Развернуть' : 'Свернуть'}" style="color:${sectionColor};">
+                        <i class="fa-solid ${collapsed ? 'fa-chevron-up' : 'fa-chevron-down'}"></i>
+                    </button>
+                    <span class="fw-semibold flex-grow-1 text-truncate" title="${_escAttr(sec.name)}" style="color:${sectionColor};">${_escHtml(sec.name)}</span>
                 <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 add-qs-to-section-btn" data-section-id="${_escAttr(sec.id)}" title="Добавить выбранные вопросы">
                     <i class="fa-solid fa-plus"></i>
                 </button>
@@ -112,7 +113,14 @@ function _buildSectionQuestionHtml(sectionId, q) {
 function _renderAvailableQuestions() {
     const container = document.getElementById('availableQuestionsList');
     const assigned = _getAssignedQNames();
-    const available = _getAllStep3QNames().filter(q => !assigned.has(q));
+
+    // Собираем все имена доноров которые уже склеены с кем-то
+    const donorNames = new Set();
+    Object.values(window.questionMerges || {}).forEach(donors => {
+        donors.forEach(d => donorNames.add(d));
+    });
+
+    const available = _getAllStep3QNames().filter(q => !assigned.has(q) && !donorNames.has(q));
 
     if (!available.length) {
         container.innerHTML = '<p class="text-muted small text-center mt-2 mb-0">Все вопросы распределены по разделам</p>';
@@ -229,6 +237,7 @@ document.getElementById('sectionsList').addEventListener('click', e => {
         document.getElementById('editSectionName').value = sec.name;
         document.getElementById('editSectionName').classList.remove('is-invalid');
         document.getElementById('editSectionDesc').value = sec.description || '';
+        document.getElementById('editSectionColor').value = sec.color || '#a0bce5';
         new bootstrap.Modal(document.getElementById('editSectionModal')).show();
         return;
     }
@@ -288,6 +297,7 @@ document.getElementById('confirmAddSectionBtn').addEventListener('click', () => 
         id: 'sec_' + (++_sectionIdCounter),
         name,
         description: document.getElementById('newSectionDesc').value.trim(),
+        color: document.getElementById('newSectionColor').value,
         questions: []
     });
     bootstrap.Modal.getInstance(document.getElementById('addSectionModal')).hide();
@@ -303,6 +313,7 @@ document.getElementById('confirmEditSectionBtn').addEventListener('click', () =>
     if (sec) {
         sec.name = name;
         sec.description = document.getElementById('editSectionDesc').value.trim();
+        sec.color = document.getElementById('editSectionColor').value;
     }
     bootstrap.Modal.getInstance(document.getElementById('editSectionModal')).hide();
     _renderSectionsList();
@@ -330,14 +341,19 @@ function openMergeQuestionsModal(sourceName) {
     document.getElementById('mergeQuestionsSourceLabel').textContent = `«${sourceName}»`;
     document.getElementById('mergeQuestionsSearch').value = '';
 
-    // Все вопросы в availableQuestionsList кроме самого источника
+    _renderAttachedDonors(sourceName);
+
     const allQNames = Array.from(
         document.querySelectorAll('#availableQuestionsList .available-q-item')
     ).map(el => el.dataset.qname).filter(n => n !== sourceName);
 
     _renderMergeQuestionsList(allQNames, '');
 
-    document.getElementById('mergeQuestionsSearch').addEventListener('input', function () {
+    // Переподвешиваем обработчик поиска (удаляем старый через clone)
+    const searchEl = document.getElementById('mergeQuestionsSearch');
+    const newSearch = searchEl.cloneNode(true);
+    searchEl.parentNode.replaceChild(newSearch, searchEl);
+    newSearch.addEventListener('input', function () {
         _renderMergeQuestionsList(allQNames, this.value.trim().toLowerCase());
     });
 
@@ -421,3 +437,95 @@ function _updateMergeIndicator(sourceName) {
         btn.title = 'Склеить с другим вопросом';
     }
 }
+// Обработчики случайного цвета
+document.getElementById('randomNewSectionColor').addEventListener('click', () => {
+    document.getElementById('newSectionColor').value = randomColor();
+});
+document.getElementById('randomEditSectionColor').addEventListener('click', () => {
+    document.getElementById('editSectionColor').value = randomColor();
+});
+
+
+function _renderAttachedDonors(sourceName) {
+    // Ищем или создаём блок прикреплённых доноров внутри модалки
+    let attachedBlock = document.getElementById('mergeQuestionsAttached');
+    if (!attachedBlock) {
+        // Вставляем перед строкой поиска
+        document.getElementById('mergeQuestionsSearch').insertAdjacentHTML('beforebegin', `
+            <div id="mergeQuestionsAttached" class="mb-2"></div>
+        `);
+        attachedBlock = document.getElementById('mergeQuestionsAttached');
+    }
+
+    const donors = (window.questionMerges && window.questionMerges[sourceName]) || [];
+    if (!donors.length) {
+        attachedBlock.innerHTML = '';
+        return;
+    }
+
+    attachedBlock.innerHTML = `
+        <div class="small fw-semibold text-muted mb-1"><i class="fa-solid fa-paperclip me-1"></i>Уже прикреплены:</div>
+        ${donors.map(d => `
+            <div class="d-flex align-items-center justify-content-between py-1 border-bottom gap-2 attached-donor-row" data-donor="${_escAttr(d)}">
+                <span class="small text-truncate flex-grow-1" title="${_escAttr(d)}">${_escHtml(d)}</span>
+                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1 detach-donor-btn flex-shrink-0"
+                        data-source="${_escAttr(sourceName)}" data-donor="${_escAttr(d)}" title="Открепить вопрос">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>`).join('')}
+    `;
+}
+
+document.getElementById('mergeQuestionsModal').addEventListener('click', (e) => {
+    const btn = e.target.closest('.detach-donor-btn');
+    if (!btn) return;
+
+    const sourceName = btn.dataset.source;
+    const donorName = btn.dataset.donor;
+
+    // Удаляем донора из массива склеек
+    if (window.questionMerges && window.questionMerges[sourceName]) {
+        window.questionMerges[sourceName] = window.questionMerges[sourceName].filter(d => d !== donorName);
+        if (window.questionMerges[sourceName].length === 0) {
+            delete window.questionMerges[sourceName];
+        }
+    }
+
+    // Возвращаем донора в правую панель
+    const container = document.getElementById('availableQuestionsList');
+    // Проверяем что его там нет
+    const alreadyThere = container.querySelector(`.available-q-item[data-qname="${CSS.escape(donorName)}"]`);
+    if (!alreadyThere) {
+        container.insertAdjacentHTML('beforeend', `
+            <div class="available-q-item" data-qname="${_escAttr(donorName)}">
+                <input type="checkbox" class="form-check-input flex-shrink-0 avail-q-cb cursor-pointer" data-qname="${_escAttr(donorName)}">
+                <span class="text-truncate small" title="${_escAttr(donorName)}">${_escHtml(donorName)}</span>
+                <button type="button" class="btn btn-sm btn-outline-secondary ms-1 merge-question-btn" data-qname="${_escAttr(donorName)}" title="Склеить с другим вопросом"><i class="fa-solid fa-link"></i></button>
+            </div>`);
+        // Восстанавливаем draggable и обработчики
+        const newItem = container.querySelector(`.available-q-item[data-qname="${CSS.escape(donorName)}"]`);
+        if (newItem) {
+            newItem.setAttribute('draggable', 'true');
+            newItem.addEventListener('click', e => {
+                if (e.target.classList.contains('avail-q-cb')) return;
+                const cb = newItem.querySelector('.avail-q-cb');
+                if (cb) cb.checked = !cb.checked;
+                _syncSelectAllAvailableQ();
+            });
+            newItem.addEventListener('dragstart', e => {
+                newItem.classList.add('dragging');
+                window._step4DragNames = [donorName];
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', donorName);
+            });
+            newItem.addEventListener('dragend', () => newItem.classList.remove('dragging'));
+            newItem.querySelector('.avail-q-cb').addEventListener('change', _syncSelectAllAvailableQ);
+        }
+    }
+
+    // Обновляем индикатор кнопки источника
+    _updateMergeIndicator(sourceName);
+
+    // Перерисовываем блок прикреплённых
+    _renderAttachedDonors(sourceName);
+});

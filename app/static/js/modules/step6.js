@@ -176,7 +176,7 @@ async function _doExport() {
                     const fileBlob = new Blob([fileBytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
                     const fileUrl = URL.createObjectURL(fileBlob);
                     const a = document.createElement('a');
-                    a.href = fileUrl; a.download = 'report_analysis.docx';
+                    a.href = fileUrl; a.download = msg.filename || 'report_analysis.docx';
                     document.body.appendChild(a); a.click();
                     document.body.removeChild(a); URL.revokeObjectURL(fileUrl);
 

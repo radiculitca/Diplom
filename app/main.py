@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, UploadFile, File
 from typing import List
 from fastapi.templating import Jinja2Templates
+from datetime import datetime
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, StreamingResponse
 import pandas as pd
@@ -127,9 +128,12 @@ async def export_docx_stream(request: ExportDocxRequest):
                     questions,
                     progress_callback=progress_cb,
                 )
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"report_{timestamp}.docx"
                 loop.call_soon_threadsafe(queue.put_nowait, {
                     "type": "done",
-                    "file": base64.b64encode(analysis_bytes).decode()
+                    "file": base64.b64encode(analysis_bytes).decode(),
+                    "filename": filename
                 })
             except Exception as e:
                 loop.call_soon_threadsafe(queue.put_nowait, {"type": "error", "message": str(e)})
